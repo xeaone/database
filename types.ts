@@ -50,12 +50,20 @@ export interface OrderBy {
 
 export type Value = null | undefined | boolean | string | number |
     Date | Value[] | { [ key: string ]: Value; };
-export interface CreateData {
-    id?: string;
+export interface RemoveData {
+    id: string;
+    [ key: string ]: Value;
+}
+export interface ViewData {
+    id: string;
     [ key: string ]: Value;
 }
 export interface UpdateData {
     id: string;
+    [ key: string ]: Value;
+}
+export interface CreateData {
+    id?: string;
     [ key: string ]: Value;
 }
 

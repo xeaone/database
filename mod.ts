@@ -7,8 +7,7 @@ import {
     // CompositeFilterOperator,
     // FieldReference,
     // OrderBy,
-    Value,
-    CreateData, UpdateData, SearchData
+    Value, ViewData, RemoveData, CreateData, UpdateData, SearchData
 } from './types.ts';
 
 const encoder = new TextEncoder();
@@ -82,7 +81,9 @@ export default class Database {
             return 'stringValue';
         } else if (typeof value === 'boolean') {
             return 'booleanValue';
-        } else if (typeof value === 'number' && isFinite(value)) {
+        } else if (typeof value === 'number' && value % 1 !== 0) {
+            return 'doubleValue';
+        } else if (typeof value === 'number' && value % 1 === 0) {
             return 'integerValue';
         } else if (value instanceof Date) {
             return 'timestampValue';
@@ -107,8 +108,8 @@ export default class Database {
 
         for (const key in data) {
             const value = data[ key ];
-            if (key === 'id') continue;
-            updateMask?.push(key);
+            if (key !== 'id') updateMask?.push(key);
+
             if (value === null) {
                 data[ key ] = { nullValue: value };
             } else if (value === undefined) {
@@ -117,7 +118,9 @@ export default class Database {
                 data[ key ] = { stringValue: value };
             } else if (typeof value === 'boolean') {
                 data[ key ] = { booleanValue: value };
-            } else if (typeof value === 'number' && isFinite(value)) {
+            } else if (typeof value === 'number' && value % 1 !== 0) {
+                data[ key ] = { doubleValue: value };
+            } else if (typeof value === 'number' && value % 1 === 0) {
                 data[ key ] = { integerValue: value };
             } else if (value instanceof Date) {
                 data[ key ] = { timestampValue: value };
@@ -202,7 +205,7 @@ export default class Database {
         ).then(response => response.json());
 
         if (result.error) {
-            throw new Error(`${result.error.status} - ${result.error.message}`);
+            throw new Error(`${method} ${result.error.status} - ${result.error.message}`);
         }
 
         return this.#handle(result);
@@ -238,17 +241,17 @@ export default class Database {
         this.#expires = Date.now() + (result.expires_in * 1000);
     }
 
-    async remove (data: any, collection: string) {
+    async remove (collection: string, data: RemoveData) {
         await this.token();
         return this.#fetch('delete', `/${collection}/${data.id}`);
     }
 
-    async view (data: any, collection: string) {
+    async view (collection: string, data: ViewData) {
         await this.token();
         return this.#fetch('get', `/${collection}/${data.id}`);
     }
 
-    async create (data: CreateData, collection: string) {
+    async create (collection: string, data: CreateData) {
         await this.token();
 
         const id = data.id ?? crypto.randomUUID();
@@ -260,7 +263,7 @@ export default class Database {
         return this.#fetch('post', `/${collection}?documentId=${id}`, body);
     }
 
-    async update (data: UpdateData, collection: string) {
+    async update (collection: string, data: UpdateData) {
         await this.token();
 
         const id = data.id;
@@ -277,7 +280,7 @@ export default class Database {
         return this.#fetch('patch', `/${collection}/${id}${query}`, body);
     }
 
-    async search (data: SearchData, collection: string) {
+    async search (collection: string, data: SearchData) {
         await this.token();
 
         let where;

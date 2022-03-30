@@ -7,8 +7,8 @@ const database = new Database();
 database.key(key);
 database.project(project);
 
-// const newUser = await database.create({ firstName: 'foo', lastName: 'bar', num: 1, p: 2.2, bool: true, n: null }, 'users');
-// console.log(newUser, newUser.id);
+const newUser = await database.create('users', { firstName: 'foo', lastName: 'bar', num: 1, p: 2.2, bool: true, n: null });
+console.log(newUser, newUser.id);
 
 // const users = await database.view('users');
 // console.log(users);
@@ -17,8 +17,8 @@ database.project(project);
 // users[ 0 ].firstName = 'foo';
 // await database.update(users[ 0 ], 'users');
 
-const search = await database.search({ account: '1' }, 'users');
-console.log(search);
+// const search = await database.search('users', { account: '1' });
+// console.log(search);
 
 // const s = await database.search({
 //     firstName: 'foo',
