@@ -27,13 +27,13 @@ console.log(newUser, newUser.id);
 // }, 'users');
 // console.log(s);
 
-// const r = await database.search({
-//     firstName: 'foo',
-//     $limit: 1,
-//     $offset: 1,
-//     $orderBy: [ { field: { fieldPath: 'index' } } ],
-// }, 'users');
-// console.log(r);
+const r = await database.search('users', {
+    firstName: 'foo',
+    $limit: 10,
+    $offset: 1,
+    $orderBy: [ { field: { fieldPath: 'index' } } ],
+});
+console.log(r);
 
 
 

@@ -1,5 +1,5 @@
 
-export interface Key {
+export type Key = {
     type?: string;
     project_id?: string;
     private_key_id?: string;
@@ -10,20 +10,20 @@ export interface Key {
     token_uri?: string;
     auth_provider_x509_cert_url?: string;
     client_x509_cert_url?: string;
-}
+};
 
-export interface Payload {
+export type Payload = {
     iss: string;
     aud: string;
     exp: number;
     iat: number;
     scope: string;
-}
+};
 
-export interface Header {
+export type Header = {
     alg: 'RS256';
     [ key: string ]: unknown;
-}
+};
 
 export type FieldFilterOperator =
     'OPERATOR_UNSPECIFIED' |
@@ -40,34 +40,39 @@ export type FieldFilterOperator =
 
 export type CompositeFilterOperator = 'AND' | 'OPERATOR_UNSPECIFIED';
 
-export interface FieldReference {
+export type FieldReference = {
     fieldPath: string;
-}
-export interface OrderBy {
+};
+
+export type OrderBy = {
     field: FieldReference,
     direction?: 'ASCENDING' | 'DESCENDING' | 'DIRECTION_UNSPECIFIED';
-}
+};
 
 export type Value = null | undefined | boolean | string | number |
     Date | Value[] | { [ key: string ]: Value; };
-export interface RemoveData {
+
+export type RemoveData = {
     id: string;
     [ key: string ]: Value;
-}
-export interface ViewData {
+};
+
+export type ViewData = {
     id: string;
     [ key: string ]: Value;
-}
-export interface UpdateData {
+};
+
+export type UpdateData = {
     id: string;
     [ key: string ]: Value;
-}
-export interface CreateData {
+};
+
+export type CreateData = {
     id?: string;
     [ key: string ]: Value;
-}
+};
 
-export interface SearchData {
+export type SearchData = {
     $from?: any;
     $where?: any;
     $endAt?: any;
@@ -76,7 +81,7 @@ export interface SearchData {
     $offset?: number;
     $orderBy?: any | OrderBy[];
     [ key: string ]: Value;
-}
+};
 
 // export interface LatLng {
 //     latitude: number;

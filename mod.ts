@@ -241,17 +241,20 @@ export default class Database {
         this.#expires = Date.now() + (result.expires_in * 1000);
     }
 
-    async remove (collection: string, data: RemoveData) {
+    async remove (collection: string, data: RemoveData): Promise<Record<string, Value>> {
+        // async remove<C extends string, D extends RemoveData> (collection: C, data: D) {
         await this.token();
         return this.#fetch('delete', `/${collection}/${data.id}`);
     }
 
-    async view (collection: string, data: ViewData) {
+    async view (collection: string, data: ViewData): Promise<Record<string, Value>> {
+        // async view<C extends string, D extends ViewData> (collection: C, data: D) {
         await this.token();
         return this.#fetch('get', `/${collection}/${data.id}`);
     }
 
-    async create (collection: string, data: CreateData) {
+    async create (collection: string, data: CreateData): Promise<Record<string, Value>> {
+        // async create<C extends string, D extends CreateData> (collection: C, data: D) {
         await this.token();
 
         const id = data.id ?? crypto.randomUUID();
@@ -263,7 +266,8 @@ export default class Database {
         return this.#fetch('post', `/${collection}?documentId=${id}`, body);
     }
 
-    async update (collection: string, data: UpdateData) {
+    async update (collection: string, data: UpdateData): Promise<Record<string, Value>> {
+        // async update<C extends string, D extends UpdateData> (collection: C, data: D) {
         await this.token();
 
         const id = data.id;
@@ -280,7 +284,8 @@ export default class Database {
         return this.#fetch('patch', `/${collection}/${id}${query}`, body);
     }
 
-    async search (collection: string, data: SearchData) {
+    async search (collection: string, data: SearchData): Promise<Value[]> {
+        // async search<C extends string, D extends SearchData> (collection: C, data: D) {
         await this.token();
 
         let where;
