@@ -46,19 +46,48 @@ export default class Database {
     #key: any;
     #project: string;
 
+    #require: Array<string> = [];
+    #constant: Array<string> = [];
+
     constructor (options: any = {}) {
         this.#key = options.key;
         this.#project = options.project;
     }
 
+    require (data: Array<string>) {
+        if (data) {
+            this.#require = data;
+            return this;
+        } else {
+            return this.#require;
+        }
+    }
+
+    constant (data: Array<string>) {
+        if (data) {
+            this.#constant = data;
+            return this;
+        } else {
+            return this.#constant;
+        }
+    }
+
     project (data: string) {
-        this.#project = data;
-        return this;
+        if (data) {
+            this.#project = data;
+            return this;
+        } else {
+            return this.#project;
+        }
     }
 
     key (data: Key) {
-        this.#key = data;
-        return this;
+        if (data) {
+            this.#key = data;
+            return this;
+        } else {
+            return this.#key;
+        }
     }
 
     #properties = [
@@ -100,15 +129,12 @@ export default class Database {
         return Object.keys(value).find(key => this.#properties.includes(key));
     }
 
-
-    format (data: any) {
-        return this.#format(data);
-    }
     #format (data: any, updateMask?: string[]) {
+        data = { ...data };
 
         for (const key in data) {
             const value = data[ key ];
-            if (key !== 'id') updateMask?.push(key);
+            if (key !== 'id' && !this.#constant.includes(key)) updateMask?.push(key);
 
             if (value === null) {
                 data[ key ] = { nullValue: value };
@@ -211,7 +237,11 @@ export default class Database {
         return this.#handle(result);
     }
 
-    async token () {
+    async #before (data: any) {
+
+        const required = this.#require.find(require => require in data === false);
+        if (required) throw new Error(`required property ${required} not found`);
+
         if (this.#expires && this.#expires >= Date.now()) return;
 
         const key = await createRsa(this.#key.private_key);
@@ -243,19 +273,19 @@ export default class Database {
 
     async remove (collection: string, data: RemoveData): Promise<Record<string, Value>> {
         // async remove<C extends string, D extends RemoveData> (collection: C, data: D) {
-        await this.token();
+        await this.#before(data);
         return this.#fetch('delete', `/${collection}/${data.id}`);
     }
 
     async view (collection: string, data: ViewData): Promise<Record<string, Value>> {
         // async view<C extends string, D extends ViewData> (collection: C, data: D) {
-        await this.token();
+        await this.#before(data);
         return this.#fetch('get', `/${collection}/${data.id}`);
     }
 
     async create (collection: string, data: CreateData): Promise<Record<string, Value>> {
         // async create<C extends string, D extends CreateData> (collection: C, data: D) {
-        await this.token();
+        await this.#before(data);
 
         const id = data.id ?? crypto.randomUUID();
         data.id = id;
@@ -268,7 +298,7 @@ export default class Database {
 
     async update (collection: string, data: UpdateData): Promise<Record<string, Value>> {
         // async update<C extends string, D extends UpdateData> (collection: C, data: D) {
-        await this.token();
+        await this.#before(data);
 
         const id = data.id;
         const updateMask: string[] = [];
@@ -284,9 +314,9 @@ export default class Database {
         return this.#fetch('patch', `/${collection}/${id}${query}`, body);
     }
 
-    async search (collection: string, data: SearchData): Promise<Value[]> {
+    async search (collection: string, data: SearchData): Promise<Array<Value>> {
         // async search<C extends string, D extends SearchData> (collection: C, data: D) {
-        await this.token();
+        await this.#before(data);
 
         let where;
         if ('$where' in data) {
@@ -297,6 +327,7 @@ export default class Database {
             for (const key in data) {
                 if (key.startsWith('$')) continue;
                 const value = data[ key ];
+                if (value === undefined) continue;
                 const fieldFilter = this.#fieldFilter('EQUAL', key, value);
                 filters.push({ fieldFilter });
             }
