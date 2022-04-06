@@ -49,27 +49,32 @@ export type OrderBy = {
     direction?: 'ASCENDING' | 'DESCENDING' | 'DIRECTION_UNSPECIFIED';
 };
 
-export type Value = null | undefined | boolean | string | number | Value[] | { [ key: string ]: Value; };
+export type Value = null | undefined | boolean | string | number | any[] | { [ key: string ]: any; };
+// export type Value = null | undefined | boolean | string | number | Value[] | { [ key: string ]: Value; };
 // export type Value = null | undefined | boolean | string | number | Array<Value> | Record<string, Value>;
 
 export type RemoveData = {
     id: string;
     [ key: string ]: Value;
+    // [ key: string ]: any;
 };
 
 export type ViewData = {
     id: string;
     [ key: string ]: Value;
+    // [ key: string ]: any;
 };
 
 export type UpdateData = {
     id: string;
     [ key: string ]: Value;
+    // [ key: string ]: any;
 };
 
 export type CreateData = {
     id?: string;
     [ key: string ]: Value;
+    // [ key: string ]: any;
 };
 
 export type SearchData = {
@@ -82,6 +87,7 @@ export type SearchData = {
     $orderBy?: OrderBy[];
     // $orderBy?: Array<OrderBy>;
     [ key: string ]: Value;
+    // [ key: string ]: any;
 };
 
 // export interface LatLng {

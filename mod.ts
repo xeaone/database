@@ -7,7 +7,8 @@ import {
     // CompositeFilterOperator,
     // FieldReference,
     // OrderBy,
-    Value, ViewData, RemoveData, CreateData, UpdateData, SearchData
+    // Value,
+    ViewData, RemoveData, CreateData, UpdateData, SearchData
 } from './types.ts';
 
 const encoder = new TextEncoder();
@@ -96,12 +97,12 @@ export default class Database {
         'mapValue', 'nullValue', 'referenceValue', 'stringValue', 'timestampValue'
     ];
 
-    #fieldFilter (operator: FieldFilterOperator, key: string, value: Value) {
+    #fieldFilter (operator: FieldFilterOperator, key: string, value: any) {
         const type = this.#type(value);
         return { op: operator, value: { [ type ]: value }, field: { fieldPath: key } };
     }
 
-    #type (value: Value) {
+    #type (value: any) {
         if (value === null) {
             return 'nullValue';
         } else if (value === undefined) {
@@ -239,7 +240,7 @@ export default class Database {
 
     async #before (data: any) {
 
-        const required = this.#require.find(require => require in data === false);
+        const required = data.$require === false ? false : this.#require.find(require => require in data === false);
         if (required) throw new Error(`required property ${required} not found`);
 
         if (this.#expires && this.#expires >= Date.now()) return;
@@ -271,19 +272,19 @@ export default class Database {
         this.#expires = Date.now() + (result.expires_in * 1000);
     }
 
-    async remove (collection: string, data: RemoveData): Promise<Record<string, Value>> {
+    async remove (collection: string, data: RemoveData): Promise<Record<string, any>> {
         // async remove<C extends string, D extends RemoveData> (collection: C, data: D) {
         await this.#before(data);
         return this.#fetch('delete', `/${collection}/${data.id}`);
     }
 
-    async view (collection: string, data: ViewData): Promise<Record<string, Value>> {
+    async view (collection: string, data: ViewData): Promise<Record<string, any>> {
         // async view<C extends string, D extends ViewData> (collection: C, data: D) {
         await this.#before(data);
         return this.#fetch('get', `/${collection}/${data.id}`);
     }
 
-    async create (collection: string, data: CreateData): Promise<Record<string, Value>> {
+    async create (collection: string, data: CreateData): Promise<Record<string, any>> {
         // async create<C extends string, D extends CreateData> (collection: C, data: D) {
         await this.#before(data);
 
@@ -296,7 +297,7 @@ export default class Database {
         return this.#fetch('post', `/${collection}?documentId=${id}`, body);
     }
 
-    async update (collection: string, data: UpdateData): Promise<Record<string, Value>> {
+    async update (collection: string, data: UpdateData): Promise<Record<string, any>> {
         // async update<C extends string, D extends UpdateData> (collection: C, data: D) {
         await this.#before(data);
 
@@ -314,7 +315,7 @@ export default class Database {
         return this.#fetch('patch', `/${collection}/${id}${query}`, body);
     }
 
-    async search (collection: string, data: SearchData): Promise<Array<Value>> {
+    async search (collection: string, data: SearchData): Promise<Array<any>> {
         // async search<C extends string, D extends SearchData> (collection: C, data: D) {
         await this.#before(data);
 
