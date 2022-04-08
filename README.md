@@ -1,2 +1,2 @@
 # X Database
-A Deno Firestroe database module library. Coming Soon.
+A Deno Firestore database client. Coming Soon.
