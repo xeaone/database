@@ -4,10 +4,6 @@ import {
     Payload,
     Header,
     FieldFilterOperator,
-    // CompositeFilterOperator,
-    // FieldReference,
-    // OrderBy,
-    // Value,
     ViewData, RemoveData, CreateData, UpdateData, SearchData
 } from './types.ts';
 
@@ -37,6 +33,34 @@ const createRsa = function (data: string) {
     const binaryDerString = atob(contents);
     const binaryDer = stringToArrayBuffer(binaryDerString);
     return crypto.subtle.importKey('pkcs8', binaryDer, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, true, [ 'sign' ]);
+};
+
+const Operator = function (operator: string | undefined) {
+    operator = (operator ?? 'EQUAL').toLowerCase();
+    if (operator === 'l') operator = 'LESS_THAN';
+    else if (operator === 'le') operator = 'LESS_THAN_OR_EQUAL';
+    else if (operator === 'g') operator = 'GREATER_THAN';
+    else if (operator === 'ge') operator = 'GREATER_THAN_OR_EQUAL';
+    else if (operator === 'e') operator = 'EQUAL';
+    else if (operator === 'ne') operator = 'EQUAL';
+    else if (operator === 'ac') operator = 'ARRAY_CONTAINS';
+    else if (operator === 'aca') operator = 'ARRAY_CONTAINS_ANY';
+    else if (operator === 'i') operator = 'IN';
+    else if (operator === 'ni') operator = 'NOT_IN';
+    if (![
+        'OPERATOR_UNSPECIFIED',
+        'LESS_THAN',
+        'LESS_THAN_OR_EQUAL',
+        'GREATER_THAN',
+        'GREATER_THAN_OR_EQUAL',
+        'EQUAL',
+        'NOT_EQUAL',
+        'ARRAY_CONTAINS',
+        'IN',
+        'ARRAY_CONTAINS_ANY',
+        'NOT_IN'
+    ].includes(operator)) throw new Error('operator not valid');
+    return operator.toUpperCase() as FieldFilterOperator;
 };
 
 export default class Database {
@@ -329,15 +353,37 @@ export default class Database {
 
             for (const key in data) {
                 if (key.startsWith('$')) continue;
+
                 const value = data[ key ];
                 if (value === undefined) continue;
-                const fieldFilter = this.#fieldFilter('EQUAL', key, value);
-                filters.push({ fieldFilter });
+
+                if (key.includes('$')) {
+                    const [ name, operator ] = key.split('$');
+                    if (!name) throw new Error(`key name required ${key}`);
+                    if (!operator) throw new Error(`key operator required ${key}`);
+                    if ([ 's', 'startswith' ].includes(operator?.toLowerCase()) && typeof value === 'string') {
+                        const start = (value as string);
+                        const length = start.length;
+                        const startPart = start.slice(0, length - 1);
+                        const endPart = start.slice(length - 1, length);
+                        const end = startPart + String.fromCharCode(endPart.charCodeAt(0) + 1);
+                        filters.push({ fieldFilter: this.#fieldFilter('GREATER_THAN_OR_EQUAL', name, start) });
+                        filters.push({ fieldFilter: this.#fieldFilter('LESS_THAN', name, end) });
+                    } else {
+                        const fieldFilter = this.#fieldFilter(Operator(operator), name, value);
+                        filters.push({ fieldFilter });
+                    }
+                } else {
+                    const fieldFilter = this.#fieldFilter('EQUAL', key, value);
+                    filters.push({ fieldFilter });
+                }
+
             }
 
             if (filters.length) {
                 where = { compositeFilter: { op: 'AND', filters } };
             }
+
         }
 
         let from;
