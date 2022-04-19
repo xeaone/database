@@ -231,6 +231,8 @@ export default class Database {
             { method, headers: { 'Authorization': `Bearer ${this.#token}` }, body }
         ).then(response => response.json());
 
+        if (method === 'GET' && result?.error?.code === 404) return null;
+
         if (result.error) {
             throw new Error(`${method} ${result.error.status} - ${result.error.message}`);
         }
