@@ -1,4 +1,12 @@
 import { base64url } from './deps.ts';
+
+import {
+    OrderFormat,
+    ValueFormat,
+    DocumentFormat,
+    OperatorFormat
+} from './format.ts';
+
 import {
     Key,
     Payload,
@@ -33,34 +41,6 @@ const createRsa = function (data: string) {
     const binaryDerString = atob(contents);
     const binaryDer = stringToArrayBuffer(binaryDerString);
     return crypto.subtle.importKey('pkcs8', binaryDer, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, true, [ 'sign' ]);
-};
-
-const Operator = function (operator: string | undefined) {
-    operator = (operator ?? 'EQUAL').toLowerCase();
-    if (operator === 'l') operator = 'LESS_THAN';
-    else if (operator === 'le') operator = 'LESS_THAN_OR_EQUAL';
-    else if (operator === 'g') operator = 'GREATER_THAN';
-    else if (operator === 'ge') operator = 'GREATER_THAN_OR_EQUAL';
-    else if (operator === 'e') operator = 'EQUAL';
-    else if (operator === 'ne') operator = 'EQUAL';
-    else if (operator === 'ac') operator = 'ARRAY_CONTAINS';
-    else if (operator === 'aca') operator = 'ARRAY_CONTAINS_ANY';
-    else if (operator === 'i') operator = 'IN';
-    else if (operator === 'ni') operator = 'NOT_IN';
-    if (![
-        'OPERATOR_UNSPECIFIED',
-        'LESS_THAN',
-        'LESS_THAN_OR_EQUAL',
-        'GREATER_THAN',
-        'GREATER_THAN_OR_EQUAL',
-        'EQUAL',
-        'NOT_EQUAL',
-        'ARRAY_CONTAINS',
-        'IN',
-        'ARRAY_CONTAINS_ANY',
-        'NOT_IN'
-    ].includes(operator)) throw new Error('operator not valid');
-    return operator.toUpperCase() as FieldFilterOperator;
 };
 
 export default class Database {
@@ -154,39 +134,6 @@ export default class Database {
         return Object.keys(value).find(key => this.#properties.includes(key));
     }
 
-    #format (data: any, updateMask?: string[]) {
-        data = { ...data };
-
-        for (const key in data) {
-            const value = data[ key ];
-            if (key !== 'id' && !this.#constant.includes(key)) updateMask?.push(key);
-
-            if (value === null) {
-                data[ key ] = { nullValue: value };
-            } else if (value === undefined) {
-                delete data[ key ];
-            } else if (typeof value === 'string') {
-                data[ key ] = { stringValue: value };
-            } else if (typeof value === 'boolean') {
-                data[ key ] = { booleanValue: value };
-            } else if (typeof value === 'number' && value % 1 !== 0) {
-                data[ key ] = { doubleValue: value };
-            } else if (typeof value === 'number' && value % 1 === 0) {
-                data[ key ] = { integerValue: value };
-            } else if (value instanceof Date) {
-                data[ key ] = { timestampValue: value };
-            } else if (value instanceof Array) {
-                data[ key ] = { arrayValue: this.#format(value) };
-            } else if (typeof value === 'object') {
-                data[ key ] = { mapValue: this.#format(value) };
-            } else {
-                throw new Error(`value not allowed ${value}`);
-            }
-        }
-
-        return data;
-    }
-
     #parse (value: any) {
         const property = this.#property(value);
 
@@ -198,7 +145,6 @@ export default class Database {
             value = value[ property ];
         } else if (property === 'arrayValue') {
             value = (value[ property ] && value[ property ].values || []).map(this.#parse.bind(this));
-            // value = (value[ property ] && value[ property ].values || []).map((v: any) => this.#parse(v));
         } else if (property === 'mapValue') {
             value = this.#parse(value[ property ] && value[ property ].fields || {});
         } else if (property === 'geoPointValue') {
@@ -317,9 +263,7 @@ export default class Database {
         const id = data.id ?? crypto.randomUUID();
         data.id = id;
 
-        const fields = this.#format(data);
-        const body = { fields };
-
+        const body = DocumentFormat(data);
         return this.#fetch('post', `/${collection}?documentId=${id}`, body);
     }
 
@@ -328,14 +272,14 @@ export default class Database {
         await this.#before(data);
 
         const id = data.id;
-        const updateMask: string[] = [];
-        const fields = this.#format(data, updateMask);
-        const body = { fields };
+        const mask: string[] = [];
+        const body = DocumentFormat(data, this.#constant, mask);
 
         const query = [
             '?',
-            'currentDocument.exists=true&',
-            `updateMask.fieldPaths=${updateMask.join('&updateMask.fieldPaths=')}`
+            'currentDocument.exists=true',
+            '&',
+            `updateMask.fieldPaths=${mask.join('&updateMask.fieldPaths=')}`
         ].join('');
 
         return this.#fetch('patch', `/${collection}/${id}${query}`, body);
@@ -345,39 +289,47 @@ export default class Database {
         // async search<C extends string, D extends SearchData> (collection: C, data: D) {
         await this.#before(data);
 
-        let where;
-        if ('$where' in data) {
-            where = data.$where;
-        } else {
+        let where = data.$where;
+        let orderBy = data.$orderBy;
+        let startAt = data.$startAt;
+
+        const limit = data.$limit;
+        const endAt = data.$endAt;
+        const offset = data.$offset;
+
+        const operator = new Proxy(typeof data.$operator === 'object' ? data.$operator : {}, {
+            get: (target, name) => OperatorFormat(target[ name as string ] ?? data.$operator)
+        });
+
+        const token = data.$token;
+        for (const name in token) {
+            const value = token[ name ];
+            orderBy = orderBy ?? [];
+            startAt = startAt ?? { values: [] };
+            orderBy?.push(OrderFormat(name));
+            startAt?.values.push(ValueFormat(value));
+        }
+
+        if (!where) {
             const filters = [];
 
             for (const key in data) {
-                if (key.startsWith('$')) continue;
-
                 const value = data[ key ];
-                if (value === undefined) continue;
 
-                if (key.includes('$')) {
-                    const [ name, operator ] = key.split('$');
-                    if (!name) throw new Error(`key name required ${key}`);
-                    if (!operator) throw new Error(`key operator required ${key}`);
-                    if ([ 's', 'startswith' ].includes(operator?.toLowerCase()) && typeof value === 'string') {
-                        const start = (value as string);
-                        const length = start.length;
-                        const startPart = start.slice(0, length - 1);
-                        const endPart = start.slice(length - 1, length);
-                        const end = startPart + String.fromCharCode(endPart.charCodeAt(0) + 1);
-                        filters.push({ fieldFilter: this.#fieldFilter('GREATER_THAN_OR_EQUAL', name, start) });
-                        filters.push({ fieldFilter: this.#fieldFilter('LESS_THAN', name, end) });
-                    } else {
-                        const fieldFilter = this.#fieldFilter(Operator(operator), name, value);
-                        filters.push({ fieldFilter });
-                    }
-                } else {
-                    const fieldFilter = this.#fieldFilter('EQUAL', key, value);
-                    filters.push({ fieldFilter });
+                if (value === undefined || key.startsWith('$')) continue;
+
+                if (operator[ key ] === 'STARTS_WITH') {
+                    const start = (value as string);
+                    const length = start.length;
+                    const startPart = start.slice(0, length - 1);
+                    const endPart = start.slice(length - 1, length);
+                    const end = startPart + String.fromCharCode(endPart.charCodeAt(0) + 1);
+                    filters.push({ fieldFilter: this.#fieldFilter('GREATER_THAN_OR_EQUAL', key, start) });
+                    filters.push({ fieldFilter: this.#fieldFilter('LESS_THAN', key, end) });
+                    continue;
                 }
 
+                filters.push({ fieldFilter: this.#fieldFilter(operator[ key ] as FieldFilterOperator, key, value) });
             }
 
             if (filters.length) {
@@ -396,8 +348,8 @@ export default class Database {
         const body = {
             structuredQuery: {
                 from, where,
-                limit: data.$limit, offset: data.$offset,
-                orderBy: data.$orderBy, startAt: data.$startAt, endAt: data.$endAt
+                limit, offset,
+                orderBy, startAt, endAt
             }
         };
 

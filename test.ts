@@ -23,6 +23,7 @@ console.log(newUser, newUser.id);
 // const s = await database.search({
 //     firstName: 'foo',
 //     $limit: 1,
+//     $startAt: { values: [ { stringValue: '' } ] },
 //     $orderBy: [ { field: { fieldPath: 'index' } } ]
 // }, 'users');
 // console.log(s);
