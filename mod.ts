@@ -252,6 +252,7 @@ export default class Database {
 
     async view (collection: string, data: ViewData): Promise<Record<string, any>> {
         // async view<C extends string, D extends ViewData> (collection: C, data: D) {
+        if (!data.id) throw new Error('id required');
         await this.#before(data);
         return this.#fetch('get', `/${collection}/${data.id}`);
     }
