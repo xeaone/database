@@ -1,5 +1,6 @@
 import {
-    Order, Value
+    Direction,
+    Order, Value,
 } from './types.ts';
 
 export const OperatorFormat = function (operator: string | undefined): string {
@@ -25,8 +26,8 @@ export const OperatorFormat = function (operator: string | undefined): string {
     else return 'EQUAL';
 };
 
-export const OrderFormat = (data: string): Order => {
-    return { field: { fieldPath: data } };
+export const OrderFormat = (data: string, direction?: Direction): Order => {
+    return { field: { fieldPath: data }, direction };
 };
 
 export const ValueFormat = (data: any, path?: string): Value => {
@@ -64,4 +65,11 @@ export const DocumentFormat = function (data: any, constant?: string[], mask?: s
     }
 
     return { fields };
+};
+
+export const DirectionFormat = function (direction?: Direction): string {
+    if (direction === 'a') return 'ASCENDING';
+    if (direction === 'd') return 'DESCENDING';
+    if (direction) return direction.toUpperCase();
+    return 'ASCENDING';
 };

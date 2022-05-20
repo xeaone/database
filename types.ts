@@ -25,6 +25,8 @@ export type Header = {
     [ key: string ]: unknown;
 };
 
+export type Direction = 'a' | 'd' | 'ascending' | 'descending' | 'ASCENDING' | 'DESCENDING';
+
 export type CustomOperator =
     's' | 'startswith' | 'startsWith' | 'STARTS_WITH' |
     'i' | 'in' | 'ni' | 'notin' | 'notIn' |
@@ -85,9 +87,8 @@ export type Value =
 
 export type StartAt = { values: Array<Value>; before?: boolean; };
 
-export type Direction = 'ASCENDING' | 'DESCENDING' | 'DIRECTION_UNSPECIFIED';
 export type FieldReference = { fieldPath: string; };
-export type Order = { field: FieldReference; };
+export type Order = { field: FieldReference; direction?: Direction; };
 export type OrderBy = { field: FieldReference, direction?: Direction; }[];
 
 export type From = [ { collectionId: string; } ];
@@ -95,6 +96,7 @@ export type From = [ { collectionId: string; } ];
 export type SearchData = {
 
     $token?: { [ key: string ]: unknown; };
+    $direction?: Direction | { [ key: string ]: Direction; };
     $operator?: CustomOperator | { [ key: string ]: CustomOperator; };
 
     $where?: any;

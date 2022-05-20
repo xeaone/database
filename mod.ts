@@ -4,7 +4,8 @@ import {
     OrderFormat,
     ValueFormat,
     DocumentFormat,
-    OperatorFormat
+    OperatorFormat,
+    DirectionFormat
 } from './format.ts';
 
 import {
@@ -103,7 +104,11 @@ export default class Database {
 
     #fieldFilter (operator: FieldFilterOperator, key: string, value: any) {
         const type = this.#type(value);
-        return { op: operator, value: { [ type ]: value }, field: { fieldPath: key } };
+        return {
+            op: operator,
+            field: { fieldPath: key },
+            value: { [ type ]: value },
+        };
     }
 
     #type (value: any) {
@@ -302,6 +307,10 @@ export default class Database {
             get: (target, name) => OperatorFormat(target[ name as string ] ?? data.$operator)
         });
 
+        const direction = new Proxy(typeof data.$direction === 'object' ? data.$direction : {}, {
+            get: (target, name) => DirectionFormat(target[ name as string ] ?? data.$direction)
+        });
+
         const token = data.$token;
         for (const name in token) {
             const value = token[ name ];
@@ -325,6 +334,8 @@ export default class Database {
                     const startPart = start.slice(0, length - 1);
                     const endPart = start.slice(length - 1, length);
                     const end = startPart + String.fromCharCode(endPart.charCodeAt(0) + 1);
+                    orderBy = orderBy ?? [];
+                    orderBy?.push(OrderFormat(key, direction[ key ]));
                     filters.push({ fieldFilter: this.#fieldFilter('GREATER_THAN_OR_EQUAL', key, start) });
                     filters.push({ fieldFilter: this.#fieldFilter('LESS_THAN', key, end) });
                     continue;
