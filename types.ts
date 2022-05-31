@@ -66,6 +66,7 @@ export type ViewData = {
 
 export type UpdateData = {
     id: string;
+    $exists?: boolean;
     [ key: string ]: any;
 };
 

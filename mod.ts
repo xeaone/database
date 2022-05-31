@@ -280,10 +280,11 @@ export default class Database {
         const id = data.id;
         const mask: string[] = [];
         const body = DocumentFormat(data, this.#constant, mask);
+        const exists = data.$exists ?? true;
 
         const query = [
             '?',
-            'currentDocument.exists=true',
+            `currentDocument.exists=${exists}`,
             '&',
             `updateMask.fieldPaths=${mask.join('&updateMask.fieldPaths=')}`
         ].join('');
