@@ -9,10 +9,12 @@ import {
 } from './format.ts';
 
 import {
+    Value,
     Key,
     Payload,
     Header,
     FieldFilterOperator,
+    SetData,
     ViewData, RemoveData, CreateData, UpdateData, SearchData
 } from './types.ts';
 
@@ -249,51 +251,86 @@ export default class Database {
         this.#expires = Date.now() + (result.expires_in * 1000);
     }
 
-    async remove (collection: string, data: RemoveData): Promise<Record<string, any>> {
-        // async remove<C extends string, D extends RemoveData> (collection: C, data: D) {
+    async remove<C extends string, D extends RemoveData> (collection: C, data: D): Promise<Record<string, any>> {
         await this.#before(data);
         return this.#fetch('delete', `/${collection}/${data.id}`);
     }
 
-    async view (collection: string, data: ViewData): Promise<Record<string, any>> {
-        // async view<C extends string, D extends ViewData> (collection: C, data: D) {
+    async view<C extends string, D extends ViewData> (collection: C, data: D): Promise<any> {
         if (!data.id) throw new Error('id required');
         await this.#before(data);
         return this.#fetch('get', `/${collection}/${data.id}`);
     }
 
-    async create (collection: string, data: CreateData): Promise<Record<string, any>> {
-        // async create<C extends string, D extends CreateData> (collection: C, data: D) {
+    async create<C extends string, D extends CreateData> (collection: C, data: D): Promise<Record<string, any>> {
         await this.#before(data);
 
-        const id = data.id ?? crypto.randomUUID();
-        data.id = id;
+        const id = data.id ?? (data.id = crypto.randomUUID());
+        const fields: Record<string, Value> = {};
 
-        const body = DocumentFormat(data);
-        return this.#fetch('post', `/${collection}?documentId=${id}`, body);
+        for (const key in data) {
+            const value = data[ key ];
+            if (value === undefined) continue;
+            fields[ key ] = ValueFormat(value, key);
+        }
+
+        return this.#fetch('post', `/${collection}?documentId=${id}`, { fields });
     }
 
-    async update (collection: string, data: UpdateData): Promise<Record<string, any>> {
-        // async update<C extends string, D extends UpdateData> (collection: C, data: D) {
+    async set<C extends string, D extends SetData> (collection: C, data: D): Promise<void> {
         await this.#before(data);
 
+        const fieldPaths: Array<string> = [];
+        const fields: Record<string, Value> = {};
+        const id = data.id ?? (data.id = crypto.randomUUID());
+        const updateTransforms: Array<Record<string, string | Value>> = [];
+
+        for (const key in data) {
+            const value = data[ key ];
+
+            if (key === 'id' || key.startsWith('$') || this.#constant?.includes(key)) continue;
+
+            if (data.$increment === key || data.$increment?.includes(key)) {
+                updateTransforms.push({ fieldPath: key, increment: ValueFormat(value) });
+                continue;
+            }
+
+            if (value !== undefined) fields[ key ] = ValueFormat(value, key);
+
+            fieldPaths.push(key);
+        }
+
+        const path = `projects/${this.#project}/databases/(default)/documents/${collection}/${id}`;
+
+        await this.#fetch('post', `:batchWrite`, {
+            writes: [ {
+                updateTransforms,
+                updateMask: { fieldPaths },
+                update: { fields, name: path },
+            } ]
+        });
+    }
+
+    async update<C extends string, D extends UpdateData> (collection: C, data: D): Promise<Record<string, any>> {
+        if (!data.id) throw new Error('id required');
+
+        await this.#before(data);
+
+        let query = '?currentDocument.exists=true';
         const id = data.id;
-        const mask: string[] = [];
-        const body = DocumentFormat(data, this.#constant, mask);
-        const exists = data.$exists ?? true;
+        const fields: Record<string, Value> = {};
 
-        const query = [
-            '?',
-            `currentDocument.exists=${exists}`,
-            '&',
-            `updateMask.fieldPaths=${mask.join('&updateMask.fieldPaths=')}`
-        ].join('');
+        for (const key in data) {
+            const value = data[ key ];
+            if (key === 'id' || key.startsWith('$') || this.#constant?.includes(key)) continue;
+            if (value !== undefined) fields[ key ] = ValueFormat(value, key);
+            query += `&updateMask.fieldPaths=${key}`;
+        }
 
-        return this.#fetch('patch', `/${collection}/${id}${query}`, body);
+        return this.#fetch('patch', `/${collection}/${id}${query}`, { fields });
     }
 
-    async search (collection: string, data: SearchData): Promise<Array<any>> {
-        // async search<C extends string, D extends SearchData> (collection: C, data: D) {
+    async search<C extends string, D extends SearchData> (collection: C, data: D): Promise<Array<Record<string, any>>> {
         await this.#before(data);
 
         let where = data.$where;

@@ -54,27 +54,6 @@ export type CompositeFilterOperator = 'AND' | 'OPERATOR_UNSPECIFIED';
 // export type Value = null | undefined | boolean | string | number | Value[] | { [ key: string ]: Value; };
 // export type Value = null | undefined | boolean | string | number | Array<Value> | Record<string, Value>;
 
-export type RemoveData = {
-    id: string;
-    [ key: string ]: any;
-};
-
-export type ViewData = {
-    id: string;
-    [ key: string ]: any;
-};
-
-export type UpdateData = {
-    id: string;
-    $exists?: boolean;
-    [ key: string ]: any;
-};
-
-export type CreateData = {
-    id?: string;
-    [ key: string ]: any;
-};
-
 export type ArrayValue = { values: Array<Value>; };
 export type LatLng = { latitude: number, longitude: number; };
 export type MapValue = { fields: { [ key: string ]: Value; }; };
@@ -93,6 +72,32 @@ export type Order = { field: FieldReference; direction?: Direction; };
 export type OrderBy = { field: FieldReference, direction?: Direction; }[];
 
 export type From = [ { collectionId: string; } ];
+
+export type RemoveData = {
+    id: string;
+    // [ key: string ]: any;
+};
+
+export type ViewData = {
+    id: string;
+    // [ key: string ]: any;
+};
+
+export type SetData = {
+    id?: string;
+    $increment?: string | string[];
+    [ key: string ]: any;
+};
+
+export type CreateData = {
+    id?: string;
+    [ key: string ]: any;
+};
+
+export type UpdateData = {
+    id: string;
+    [ key: string ]: any;
+};
 
 export type SearchData = {
 
