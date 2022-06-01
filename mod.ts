@@ -277,6 +277,7 @@ export default class Database {
         return this.#fetch('post', `/${collection}?documentId=${id}`, { fields });
     }
 
+    // constants do not work correctly with first time set
     async set<C extends string, D extends SetData> (collection: C, data: D): Promise<void> {
         await this.#before(data);
 
