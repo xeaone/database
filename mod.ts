@@ -3,19 +3,17 @@ import { base64url } from './deps.ts';
 import {
     OrderFormat,
     ValueFormat,
-    DocumentFormat,
     OperatorFormat,
     DirectionFormat
 } from './format.ts';
 
 import {
-    Value,
     Key,
-    Payload,
+    Value,
     Header,
+    Payload,
     FieldFilterOperator,
-    SetData,
-    ViewData, RemoveData, CreateData, UpdateData, SearchData
+    ViewData, RemoveData, CreateData, UpdateData, SetData, SearchData
 } from './types.ts';
 
 const encoder = new TextEncoder();
@@ -48,35 +46,32 @@ const createRsa = function (data: string) {
 
 export default class Database {
 
-    #token?: string;
-    #expires?: number;
-
     #key: any;
     #project: string;
-
-    #require: Array<string> = [];
+    #token?: string;
+    #expires?: number;
+    #scope: Array<string> = [];
     #constant: Array<string> = [];
+
+    #properties = [
+        'integerValue', 'doubleValue',
+        'arrayValue', 'bytesValue', 'booleanValue', 'geoPointValue',
+        'mapValue', 'nullValue', 'referenceValue', 'stringValue', 'timestampValue'
+    ];
 
     constructor (options: any = {}) {
         this.#key = options.key;
+        this.#scope = options.scope;
         this.#project = options.project;
+        this.#constant = options.constant;
     }
 
-    require (data: Array<string>) {
+    key (data: Key) {
         if (data) {
-            this.#require = data;
+            this.#key = data;
             return this;
         } else {
-            return this.#require;
-        }
-    }
-
-    constant (data: Array<string>) {
-        if (data) {
-            this.#constant = data;
-            return this;
-        } else {
-            return this.#constant;
+            return this.#key;
         }
     }
 
@@ -89,20 +84,23 @@ export default class Database {
         }
     }
 
-    key (data: Key) {
+    scope (data: Array<string>) {
         if (data) {
-            this.#key = data;
+            this.#scope = data;
             return this;
         } else {
-            return this.#key;
+            return this.#scope;
         }
     }
 
-    #properties = [
-        'integerValue', 'doubleValue',
-        'arrayValue', 'bytesValue', 'booleanValue', 'geoPointValue',
-        'mapValue', 'nullValue', 'referenceValue', 'stringValue', 'timestampValue'
-    ];
+    constant (data: Array<string>) {
+        if (data) {
+            this.#constant = data;
+            return this;
+        } else {
+            return this.#constant;
+        }
+    }
 
     #fieldFilter (operator: FieldFilterOperator, key: string, value: any) {
         const type = this.#type(value);
@@ -219,8 +217,8 @@ export default class Database {
 
     async #before (data: any) {
 
-        const required = data.$require === false ? false : this.#require.find(require => require in data === false);
-        if (required) throw new Error(`required property ${required} not found`);
+        // const required = data.$require === false ? false : this.#require.find(require => require in data === false);
+        // if (required) throw new Error(`required property ${required} not found`);
 
         if (this.#expires && this.#expires >= Date.now()) return;
 
@@ -251,21 +249,38 @@ export default class Database {
         this.#expires = Date.now() + (result.expires_in * 1000);
     }
 
+    #id (data: any) {
+        if (typeof data.id !== 'string') throw new Error('property id required');
+        const result = [];
+        for (const name of this.#scope) {
+            const value = data[ name ];
+            if (!value || typeof value !== 'string') throw new Error(`scope property ${name} required`);
+            result.push(value);
+        }
+        result.push(data.id);
+        return result.join('-');
+    }
+
     async remove<C extends string, D extends RemoveData> (collection: C, data: D): Promise<Record<string, any>> {
+        const id = this.#id(data);
         await this.#before(data);
-        return this.#fetch('delete', `/${collection}/${data.id}`);
+        return this.#fetch('delete', `/${collection}/${id}`);
     }
 
     async view<C extends string, D extends ViewData> (collection: C, data: D): Promise<any> {
-        if (!data.id) throw new Error('id required');
+        const id = this.#id(data);
         await this.#before(data);
-        return this.#fetch('get', `/${collection}/${data.id}`);
+        return this.#fetch('get', `/${collection}/${id}`);
     }
 
     async create<C extends string, D extends CreateData> (collection: C, data: D): Promise<Record<string, any>> {
+        data.id = data.id ?? crypto.randomUUID();
+
+        if (this.#constant.some(c => !(c in data))) throw new Error('constant required');
+
+        const id = this.#id(data);
         await this.#before(data);
 
-        const id = data.id ?? (data.id = crypto.randomUUID());
         const fields: Record<string, Value> = {};
 
         for (const key in data) {
@@ -277,19 +292,42 @@ export default class Database {
         return this.#fetch('post', `/${collection}?documentId=${id}`, { fields });
     }
 
-    // constants do not work correctly with first time set
+    async update<C extends string, D extends UpdateData> (collection: C, data: D): Promise<Record<string, any>> {
+        const id = this.#id(data);
+        await this.#before(data);
+
+        const fields: Record<string, Value> = {};
+
+        let query = '?currentDocument.exists=true';
+        for (const key in data) {
+            const value = data[ key ];
+
+            if (key === 'id' ||
+                key.startsWith('$') ||
+                this.#scope.includes(key) ||
+                this.#constant.includes(key)) continue;
+
+            if (value !== undefined) fields[ key ] = ValueFormat(value, key);
+
+            query += `&updateMask.fieldPaths=${key}`;
+        }
+
+        return this.#fetch('patch', `/${collection}/${id}${query}`, { fields });
+    }
+
     async set<C extends string, D extends SetData> (collection: C, data: D): Promise<void> {
+        const id = data.id = data.id ?? crypto.randomUUID();
+
         await this.#before(data);
 
         const fieldPaths: Array<string> = [];
         const fields: Record<string, Value> = {};
-        const id = data.id ?? (data.id = crypto.randomUUID());
         const updateTransforms: Array<Record<string, string | Value>> = [];
 
         for (const key in data) {
             const value = data[ key ];
 
-            if (key === 'id' || key.startsWith('$') || this.#constant?.includes(key)) continue;
+            if (key.startsWith('$')) continue;
 
             if (data.$increment === key || data.$increment?.includes(key)) {
                 updateTransforms.push({ fieldPath: key, increment: ValueFormat(value) });
@@ -312,26 +350,13 @@ export default class Database {
         });
     }
 
-    async update<C extends string, D extends UpdateData> (collection: C, data: D): Promise<Record<string, any>> {
-        if (!data.id) throw new Error('id required');
+    async search<C extends string, D extends SearchData> (collection: C, data: D): Promise<Array<Record<string, any>>> {
 
-        await this.#before(data);
-
-        let query = '?currentDocument.exists=true';
-        const id = data.id;
-        const fields: Record<string, Value> = {};
-
-        for (const key in data) {
-            const value = data[ key ];
-            if (key === 'id' || key.startsWith('$') || this.#constant?.includes(key)) continue;
-            if (value !== undefined) fields[ key ] = ValueFormat(value, key);
-            query += `&updateMask.fieldPaths=${key}`;
+        for (const name of this.#scope) {
+            const value = data[ name ];
+            if (!value || typeof value !== 'string') throw new Error(`scope property ${name} required`);
         }
 
-        return this.#fetch('patch', `/${collection}/${id}${query}`, { fields });
-    }
-
-    async search<C extends string, D extends SearchData> (collection: C, data: D): Promise<Array<Record<string, any>>> {
         await this.#before(data);
 
         let where = data.$where;

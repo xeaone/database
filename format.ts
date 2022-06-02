@@ -1,9 +1,9 @@
 import {
-    Direction,
-    Order, Value,
+    Operator,
+    Order, Value, Direction,
 } from './types.ts';
 
-export const OperatorFormat = function (operator: string | undefined): string {
+export const OperatorFormat = function (operator: Operator): string {
     if (!operator) return 'EQUAL';
 
     else if (/^(s|starts_?with)$/i.test(operator)) return 'STARTS_WITH';
