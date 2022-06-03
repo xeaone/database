@@ -279,7 +279,6 @@ export default class Database {
         if (this.#constant.some(c => !(c in data))) throw new Error('constant required');
 
         const id = this.#id(data);
-
         const fields: Record<string, Value> = {};
 
         for (const key in data) {
@@ -293,7 +292,6 @@ export default class Database {
 
     update<C extends string, D extends UpdateData> (collection: C, data: D): Promise<Record<string, any>> {
         const id = this.#id(data);
-
         const fields: Record<string, Value> = {};
 
         let query = '?currentDocument.exists=true';
@@ -314,9 +312,9 @@ export default class Database {
     }
 
     async set<C extends string, D extends SetData> (collection: C, data: D): Promise<void> {
-        const id = data.id = data.id ?? crypto.randomUUID();
+        data.id = data.id ?? crypto.randomUUID();
 
-
+        const id = this.#id(data.id);
         const fieldPaths: Array<string> = [];
         const fields: Record<string, Value> = {};
         const updateTransforms: Array<Record<string, string | Value>> = [];
@@ -355,7 +353,6 @@ export default class Database {
                 if (!value || typeof value !== 'string') throw new Error(`scope property ${name} required`);
             }
         }
-
 
         let where = data.$where;
         let orderBy = data.$orderBy;
