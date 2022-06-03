@@ -197,39 +197,16 @@ export default class Database {
 
     }
 
-    async #fetch (method: string, path: string, body?: any) {
-        method = method.toUpperCase();
-        body = body ? JSON.stringify(body) : undefined;
-
-        const result = await fetch(
-            `https://firestore.googleapis.com/v1/projects/${this.#project}/databases/(default)/documents${path}`,
-            { method, headers: { 'Authorization': `Bearer ${this.#token}` }, body }
-        ).then(response => response.json());
-
-        if (method === 'GET' && result?.error?.code === 404) return null;
-
-        if (result.error) {
-            throw new Error(`${method} ${result.error.status} - ${result.error.message}`);
-        }
-
-        return this.#handle(result);
-    }
-
-    async #before (data: any) {
-
-        // const required = data.$require === false ? false : this.#require.find(require => require in data === false);
-        // if (required) throw new Error(`required property ${required} not found`);
+    async #auth () {
 
         if (this.#expires && this.#expires >= Date.now()) return;
 
         const key = await createRsa(this.#key.private_key);
-
         const iss = this.#key.client_email;
         const iat = Math.round(Date.now() / 1000);
         const exp = iat + (30 * 60);
         const aud = 'https://oauth2.googleapis.com/token';
         const scope = 'https://www.googleapis.com/auth/datastore';
-
         const assertion = await createJwt({ typ: 'JWT', alg: 'RS256', }, { exp, iat, iss, aud, scope }, key);
 
         const result = await fetch('https://oauth2.googleapis.com/token', {
@@ -238,7 +215,9 @@ export default class Database {
                 `assertion=${encodeURIComponent(assertion)}`,
                 `grant_type=${encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer')}`
             ].join('&'),
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
         }).then(response => response.json());
 
         if (result.error) {
@@ -249,37 +228,57 @@ export default class Database {
         this.#expires = Date.now() + (result.expires_in * 1000);
     }
 
+    async #fetch (method: string, path: string, body?: any) {
+        await this.#auth();
+
+        method = method.toUpperCase();
+        body = body ? JSON.stringify(body) : undefined;
+
+        const result = await fetch(
+            `https://firestore.googleapis.com/v1/projects/${this.#project}/databases/(default)/documents${path}`,
+            { headers: { 'Authorization': `Bearer ${this.#token}` }, method, body }
+        ).then(response => response.json());
+
+        if (method === 'GET' && result?.error?.code === 404) return null;
+
+        if (result.error) {
+            throw new Error(`${result.error.status} - ${result.error.message}`);
+        }
+
+        return this.#handle(result);
+    }
+
     #id (data: any) {
         if (typeof data.id !== 'string') throw new Error('property id required');
+        if (data.$scope === false) return data.id;
+
         const result = [];
         for (const name of this.#scope) {
             const value = data[ name ];
             if (!value || typeof value !== 'string') throw new Error(`scope property ${name} required`);
             result.push(value);
         }
+
         result.push(data.id);
         return result.join('-');
     }
 
-    async remove<C extends string, D extends RemoveData> (collection: C, data: D): Promise<Record<string, any>> {
+    remove<C extends string, D extends RemoveData> (collection: C, data: D): Promise<Record<string, any>> {
         const id = this.#id(data);
-        await this.#before(data);
         return this.#fetch('delete', `/${collection}/${id}`);
     }
 
-    async view<C extends string, D extends ViewData> (collection: C, data: D): Promise<any> {
+    view<C extends string, D extends ViewData> (collection: C, data: D): Promise<any> {
         const id = this.#id(data);
-        await this.#before(data);
         return this.#fetch('get', `/${collection}/${id}`);
     }
 
-    async create<C extends string, D extends CreateData> (collection: C, data: D): Promise<Record<string, any>> {
+    create<C extends string, D extends CreateData> (collection: C, data: D): Promise<Record<string, any>> {
         data.id = data.id ?? crypto.randomUUID();
 
         if (this.#constant.some(c => !(c in data))) throw new Error('constant required');
 
         const id = this.#id(data);
-        await this.#before(data);
 
         const fields: Record<string, Value> = {};
 
@@ -292,9 +291,8 @@ export default class Database {
         return this.#fetch('post', `/${collection}?documentId=${id}`, { fields });
     }
 
-    async update<C extends string, D extends UpdateData> (collection: C, data: D): Promise<Record<string, any>> {
+    update<C extends string, D extends UpdateData> (collection: C, data: D): Promise<Record<string, any>> {
         const id = this.#id(data);
-        await this.#before(data);
 
         const fields: Record<string, Value> = {};
 
@@ -318,7 +316,6 @@ export default class Database {
     async set<C extends string, D extends SetData> (collection: C, data: D): Promise<void> {
         const id = data.id = data.id ?? crypto.randomUUID();
 
-        await this.#before(data);
 
         const fieldPaths: Array<string> = [];
         const fields: Record<string, Value> = {};
@@ -350,14 +347,15 @@ export default class Database {
         });
     }
 
-    async search<C extends string, D extends SearchData> (collection: C, data: D): Promise<Array<Record<string, any>>> {
+    search<C extends string, D extends SearchData> (collection: C, data: D): Promise<Array<Record<string, any>>> {
 
-        for (const name of this.#scope) {
-            const value = data[ name ];
-            if (!value || typeof value !== 'string') throw new Error(`scope property ${name} required`);
+        if (data.$scope !== false) {
+            for (const name of this.#scope) {
+                const value = data[ name ];
+                if (!value || typeof value !== 'string') throw new Error(`scope property ${name} required`);
+            }
         }
 
-        await this.#before(data);
 
         let where = data.$where;
         let orderBy = data.$orderBy;

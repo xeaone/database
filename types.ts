@@ -91,6 +91,7 @@ export type SetData = {
 
 export type SearchData = {
 
+    $scope?: boolean;
     $token?: { [ key: string ]: unknown; };
     $direction?: Direction | { [ key: string ]: Direction; };
     $operator?: Operator | { [ key: string ]: Operator; };
