@@ -248,7 +248,7 @@ export default class Database {
         return this.#handle(result);
     }
 
-    #id (data: any) {
+    #id (data: Record<string, any>) {
         if (typeof data.id !== 'string') throw new Error('property id required');
         if (data.$scope === false) return data.id;
 
@@ -314,7 +314,7 @@ export default class Database {
     async set<C extends string, D extends SetData> (collection: C, data: D): Promise<void> {
         data.id = data.id ?? crypto.randomUUID();
 
-        const id = this.#id(data.id);
+        const id = this.#id(data);
         const fieldPaths: Array<string> = [];
         const fields: Record<string, Value> = {};
         const updateTransforms: Array<Record<string, string | Value>> = [];
