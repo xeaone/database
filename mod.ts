@@ -1,4 +1,4 @@
-import { base64url } from './deps.ts';
+import { base64url, base64 } from './deps.ts';
 
 import {
     OrderFormat,
@@ -19,29 +19,18 @@ import {
 const encoder = new TextEncoder();
 
 const createJwt = async function (header: Header, payload: Payload, key: CryptoKey): Promise<string> {
-    const sHeader = JSON.stringify(header);
-    const sPayload = JSON.stringify(payload);
-    const signingInput = `${base64url.encode(encoder.encode(sHeader))}.${base64url.encode(encoder.encode(sPayload))}`;
-    const signature = base64url.encode(new Uint8Array(
-        await crypto.subtle.sign({ hash: { name: 'SHA-256' }, name: 'RSASSA-PKCS1-v1_5' }, key, encoder.encode(signingInput))
-    ));
-    return `${signingInput}.${signature}`;
+    const encodedHeader = base64url.encode(JSON.stringify(header));
+    const encodedPayload = base64url.encode(JSON.stringify(payload));
+    const data = encoder.encode(`${encodedHeader}.${encodedPayload}`);
+    const signature = await crypto.subtle.sign({ hash: { name: 'SHA-256' }, name: 'RSASSA-PKCS1-v1_5' }, key, data);
+    const encodedSignature = base64url.encode(signature);
+    return `${encodedHeader}.${encodedPayload}.${encodedSignature}`;
 };
 
-const stringToArrayBuffer = function (str: string) {
-    const buf = new ArrayBuffer(str.length);
-    const bufView = new Uint8Array(buf);
-    for (let i = 0, strLen = str.length; i < strLen; i++) {
-        bufView[ i ] = str.charCodeAt(i);
-    }
-    return buf;
-};
-
-const createRsa = function (data: string) {
+const createRsa = function (data: string): Promise<CryptoKey> {
     const contents = data.replace(/^\n?-----BEGIN PRIVATE KEY-----\n?|\n?-----END PRIVATE KEY-----\n?$/g, '');
-    const binaryDerString = atob(contents);
-    const binaryDer = stringToArrayBuffer(binaryDerString);
-    return crypto.subtle.importKey('pkcs8', binaryDer, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, true, [ 'sign' ]);
+    const key = base64.decode(contents).buffer;
+    return crypto.subtle.importKey('pkcs8', key, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, true, [ 'sign' ]);
 };
 
 export default class Database {
@@ -198,18 +187,17 @@ export default class Database {
     }
 
     async #auth () {
-
         if (this.#expires && this.#expires >= Date.now()) return;
 
-        const key = await createRsa(this.#key.private_key);
         const iss = this.#key.client_email;
         const iat = Math.round(Date.now() / 1000);
         const exp = iat + (30 * 60);
         const aud = 'https://oauth2.googleapis.com/token';
         const scope = 'https://www.googleapis.com/auth/datastore';
+        const key = await createRsa(this.#key.private_key);
         const assertion = await createJwt({ typ: 'JWT', alg: 'RS256', }, { exp, iat, iss, aud, scope }, key);
 
-        const result = await fetch('https://oauth2.googleapis.com/token', {
+        const response = await fetch('https://oauth2.googleapis.com/token', {
             method: 'POST',
             body: [
                 `assertion=${encodeURIComponent(assertion)}`,
@@ -218,10 +206,12 @@ export default class Database {
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
             }
-        }).then(response => response.json());
+        });
+
+        const result = await response.json();
 
         if (result.error) {
-            throw new Error(`${result.error.status} - ${result.error.message}`);
+            throw new Error(`${JSON.stringify(result.error, null, '\t')}`);
         }
 
         this.#token = result.access_token;
@@ -234,15 +224,17 @@ export default class Database {
         method = method.toUpperCase();
         body = body ? JSON.stringify(body) : undefined;
 
-        const result = await fetch(
+        const response = await fetch(
             `https://firestore.googleapis.com/v1/projects/${this.#project}/databases/(default)/documents${path}`,
             { headers: { 'Authorization': `Bearer ${this.#token}` }, method, body }
-        ).then(response => response.json());
+        );
+
+        const result = await response.json();
 
         if (method === 'GET' && result?.error?.code === 404) return null;
 
         if (result.error) {
-            throw new Error(`${result.error.status} - ${result.error.message}`);
+            throw new Error(`${JSON.stringify(result.error, null, '\t')}`);
         }
 
         return this.#handle(result);
