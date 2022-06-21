@@ -1,7 +1,7 @@
 # X Database
 A Deno Firestore database client. Coming Soon.
 
-# scope
+# Scope
 Creates a composite `Firestore id` using the `id` and `scope` properties. Property values must be a string type.
 
 - View: Requires `id` and `scope` properties.
@@ -11,7 +11,7 @@ Creates a composite `Firestore id` using the `id` and `scope` properties. Proper
 - Set: Requires `scope` properties. Will create a new item or update an existing item depending on composite `Firestore id`.
 - Search: Requires `scope`.
 
-# constant
+# Constant
 
 - View: NA
 - Remove: NA
