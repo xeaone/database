@@ -1,4 +1,4 @@
-import { base64url, base64 } from './deps.ts';
+import jwt from './jwt.ts';
 
 import {
     OrderFormat,
@@ -10,32 +10,13 @@ import {
 import {
     Key,
     Value,
-    Header,
-    Payload,
     FieldFilterOperator,
     ViewData, RemoveData, CreateData, UpdateData, SetData, SearchData
 } from './types.ts';
 
-const encoder = new TextEncoder();
-
-const createJwt = async function (header: Header, payload: Payload, key: CryptoKey): Promise<string> {
-    const encodedHeader = base64url.encode(JSON.stringify(header));
-    const encodedPayload = base64url.encode(JSON.stringify(payload));
-    const data = encoder.encode(`${encodedHeader}.${encodedPayload}`);
-    const signature = await crypto.subtle.sign({ hash: { name: 'SHA-256' }, name: 'RSASSA-PKCS1-v1_5' }, key, data);
-    const encodedSignature = base64url.encode(signature);
-    return `${encodedHeader}.${encodedPayload}.${encodedSignature}`;
-};
-
-const createRsa = function (data: string): Promise<CryptoKey> {
-    const contents = data.replace(/^\n?-----BEGIN PRIVATE KEY-----\n?|\n?-----END PRIVATE KEY-----\n?$/g, '');
-    const key = base64.decode(contents).buffer;
-    return crypto.subtle.importKey('pkcs8', key, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, true, [ 'sign' ]);
-};
-
 export default class Database {
 
-    #key: any;
+    #key: Key;
     #project: string;
     #token?: string;
     #expires?: number;
@@ -194,8 +175,7 @@ export default class Database {
         const exp = iat + (30 * 60);
         const aud = 'https://oauth2.googleapis.com/token';
         const scope = 'https://www.googleapis.com/auth/datastore';
-        const key = await createRsa(this.#key.private_key);
-        const assertion = await createJwt({ typ: 'JWT', alg: 'RS256', }, { exp, iat, iss, aud, scope }, key);
+        const assertion = await jwt({ typ: 'JWT', alg: 'RS256', }, { exp, iat, iss, aud, scope }, this.#key.private_key);
 
         const response = await fetch('https://oauth2.googleapis.com/token', {
             method: 'POST',

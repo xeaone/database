@@ -1,17 +1,4 @@
 
-export type Header = {
-    alg: 'RS256';
-    [ key: string ]: unknown;
-};
-
-export type Payload = {
-    iss: string;
-    aud: string;
-    exp: number;
-    iat: number;
-    scope: string;
-};
-
 export type Key = {
     type?: string;
     project_id?: string;
