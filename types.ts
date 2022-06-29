@@ -57,21 +57,25 @@ export type RemoveData = {
 
 export type ViewData = {
     id: string;
+    $scope?: boolean;
     [ key: string ]: any;
 };
 
 export type CreateData = {
     id?: string;
+    $scope?: boolean;
     [ key: string ]: any;
 };
 
 export type UpdateData = {
     id: string;
+    $scope?: boolean;
     [ key: string ]: any;
 };
 
 export type SetData = {
     id?: string;
+    $scope?: boolean;
     $increment?: string | string[]; // property name/s to increment
     [ key: string ]: any;
 };
