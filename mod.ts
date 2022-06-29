@@ -10,18 +10,20 @@ import {
 import {
     Key,
     Value,
+    Options,
     FieldFilterOperator,
     ViewData, RemoveData, CreateData, UpdateData, SetData, SearchData
 } from './types.ts';
 
 export default class Database {
 
-    #key: Key;
-    #project: string;
-    #token?: string;
-    #expires?: number;
+    #key?: Key;
+    #project?: string;
     #scope: Array<string> = [];
     #constant: Array<string> = [];
+
+    #token?: string;
+    #expires?: number;
 
     #properties = [
         'integerValue', 'doubleValue',
@@ -29,11 +31,11 @@ export default class Database {
         'mapValue', 'nullValue', 'referenceValue', 'stringValue', 'timestampValue'
     ];
 
-    constructor (options: any = {}) {
+    constructor (options: Options = {}) {
         this.#key = options.key;
-        this.#scope = options.scope;
         this.#project = options.project;
-        this.#constant = options.constant;
+        this.#scope = options.scope ?? this.#scope;
+        this.#constant = options.constant ?? this.#constant;
     }
 
     key (data: Key) {
@@ -168,6 +170,7 @@ export default class Database {
     }
 
     async #auth () {
+        if (!this.#key) throw new Error('key required');
         if (this.#expires && this.#expires >= Date.now()) return;
 
         const iss = this.#key.client_email;
@@ -199,6 +202,7 @@ export default class Database {
     }
 
     async #fetch (method: string, path: string, body?: any) {
+        if (!this.#project) throw new Error('project required');
         await this.#auth();
 
         method = method.toUpperCase();
@@ -235,20 +239,21 @@ export default class Database {
         return result.join('-');
     }
 
+    view<C extends string, D extends ViewData> (collection: C, data: D): Promise<Record<string, any> | null> {
+        const id = this.#id(data);
+        return this.#fetch('get', `/${collection}/${id}`);
+    }
+
     remove<C extends string, D extends RemoveData> (collection: C, data: D): Promise<Record<string, any>> {
         const id = this.#id(data);
         return this.#fetch('delete', `/${collection}/${id}`);
     }
 
-    view<C extends string, D extends ViewData> (collection: C, data: D): Promise<any> {
-        const id = this.#id(data);
-        return this.#fetch('get', `/${collection}/${id}`);
-    }
-
     create<C extends string, D extends CreateData> (collection: C, data: D): Promise<Record<string, any>> {
         data.id = data.id ?? crypto.randomUUID();
 
-        if (this.#constant.some(c => !(c in data))) throw new Error('constant required');
+        const constant = this.#constant.find(c => !(c in data));
+        if (constant) throw new Error(`constant required ${constant}`);
 
         const id = this.#id(data);
         const fields: Record<string, Value> = {};

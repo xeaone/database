@@ -1,4 +1,11 @@
 
+export type Options = {
+    key?: Key;
+    project?: string;
+    scope?: Array<string>;
+    constant?: Array<string>;
+};
+
 export type Key = {
     type?: string;
     project_id?: string;
@@ -49,6 +56,8 @@ export type FieldReference = { fieldPath: string; };
 export type StartAt = { values: Array<Value>; before?: boolean; };
 export type Order = { field: FieldReference; direction?: Direction; };
 export type OrderBy = { field: FieldReference, direction?: Direction; }[];
+
+// export type Result = { [ key: string | number ]: string | number | boolean | Result; } | Array<string | number | boolean | Result> | null;
 
 export type RemoveData = {
     id: string;
