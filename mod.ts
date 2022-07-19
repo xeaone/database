@@ -74,7 +74,7 @@ export default class Database {
         }
     }
 
-    #fieldFilter (operator: FieldFilterOperator, key: string, value: any) {
+    #fieldFilter (operator: FieldFilterOperator, key: string, value: any): any {
         const type = this.#type(value);
         return {
             op: operator,

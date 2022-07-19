@@ -96,14 +96,14 @@ export type SearchData = {
     $direction?: Direction | { [ key: string ]: Direction; };
     $operator?: Operator | { [ key: string ]: Operator; };
 
-    $where?: any;
-    $endAt?: any;
-    $limit?: number;
-    $offset?: number;
+    $where?: any; // Firestore
+    $endAt?: any; // Firestore
+    $limit?: number; // Firestore: The maximum number of results to return.
+    $offset?: number; // Firestore: The number of results to skip.
 
-    $from?: From;
-    $startAt?: StartAt;
-    $orderBy?: OrderBy;
+    $from?: From; // Firestore
+    $startAt?: StartAt; // Firestore
+    $orderBy?: OrderBy; // Firestore
 
     [ key: string ]: any;
 
