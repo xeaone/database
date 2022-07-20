@@ -9,8 +9,13 @@ import {
 
 import {
     Key,
+    Rule,
     Value,
+    Action,
     Options,
+    Method,
+    ResultArray,
+    ResultRecord,
     FieldFilterOperator,
     ViewData, RemoveData, CreateData, UpdateData, SetData, SearchData
 } from './types.ts';
@@ -19,8 +24,7 @@ export default class Database {
 
     #key?: Key;
     #project?: string;
-    #scope: Array<string> = [];
-    #constant: Array<string> = [];
+    #rule: Map<string, Rule> = new Map();
 
     #token?: string;
     #expires?: number;
@@ -31,50 +35,12 @@ export default class Database {
         'mapValue', 'nullValue', 'referenceValue', 'stringValue', 'timestampValue'
     ];
 
-    constructor (options: Options = {}) {
-        this.#key = options.key;
-        this.#project = options.project;
-        this.#scope = options.scope ?? this.#scope;
-        this.#constant = options.constant ?? this.#constant;
+    constructor (options?: Options) {
+        this.#key = this.#key ?? options?.key;
+        this.#project = this.#project ?? options?.project;
     }
 
-    key (data: Key) {
-        if (data) {
-            this.#key = data;
-            return this;
-        } else {
-            return this.#key;
-        }
-    }
-
-    project (data: string) {
-        if (data) {
-            this.#project = data;
-            return this;
-        } else {
-            return this.#project;
-        }
-    }
-
-    scope (data: Array<string>) {
-        if (data) {
-            this.#scope = data;
-            return this;
-        } else {
-            return this.#scope;
-        }
-    }
-
-    constant (data: Array<string>) {
-        if (data) {
-            this.#constant = data;
-            return this;
-        } else {
-            return this.#constant;
-        }
-    }
-
-    #fieldFilter (operator: FieldFilterOperator, key: string, value: any): any {
+    #fieldFilter (operator: FieldFilterOperator, key: string, value: any) {
         const type = this.#type(value);
         return {
             op: operator,
@@ -140,7 +106,7 @@ export default class Database {
     #handle (result: any): any {
 
         if (result.error) {
-            throw new Error(`${result.error.status} - ${result.error.message}`);
+            throw new Error(JSON.stringify(result.error, null, '\t'));
         }
 
         if (result instanceof Array) {
@@ -194,112 +160,179 @@ export default class Database {
         const result = await response.json();
 
         if (result.error) {
-            throw new Error(`${JSON.stringify(result.error, null, '\t')}`);
+            throw new Error(JSON.stringify(result.error, null, '\t'));
         }
 
         this.#token = result.access_token;
         this.#expires = Date.now() + (result.expires_in * 1000);
     }
 
-    async #fetch (method: string, path: string, body?: any) {
+    async #fetch (method: Method, path: string, body?: any) {
         if (!this.#project) throw new Error('project required');
-        await this.#auth();
 
-        method = method.toUpperCase();
-        body = body ? JSON.stringify(body) : undefined;
+        await this.#auth();
 
         const response = await fetch(
             `https://firestore.googleapis.com/v1/projects/${this.#project}/databases/(default)/documents${path}`,
-            { headers: { 'Authorization': `Bearer ${this.#token}` }, method, body }
+            {
+                method,
+                body: body ? JSON.stringify(body) : undefined,
+                headers: { 'Authorization': `Bearer ${this.#token}` }
+            }
         );
 
         const result = await response.json();
 
+        if (method === 'DELETE' && response.status === 200) return;
         if (method === 'GET' && result?.error?.code === 404) return null;
 
         if (result.error) {
-            throw new Error(`${JSON.stringify(result.error, null, '\t')}`);
+            throw new Error(JSON.stringify(result.error, null, '\t'));
         }
 
         return this.#handle(result);
     }
 
-    #id (data: Record<string, any>) {
-        if (typeof data.id !== 'string') throw new Error('property id required');
-        if (data.$scope === false) return data.id;
+    key (data: Key): this {
+        this.#key = data;
+        return this;
+    }
 
-        const result = [];
-        for (const name of this.#scope) {
-            const value = data[ name ];
-            if (!value || typeof value !== 'string') throw new Error(`scope property ${name} required`);
-            result.push(value);
+    project (data: string): this {
+        this.#project = data;
+        return this;
+    }
+
+    rule (action: Action, collection: '*' | string, name: '*' | string, method: Rule): this {
+        this.#rule.set(`${action}.${collection}.${name}`, method);
+        return this;
+    }
+
+    view<C extends string, D extends ViewData> (collection: C, data: D): Promise<ResultRecord | null> {
+
+        if (data.$rule !== false) {
+            this.#rule.get(`view.${collection}.*`)?.(data);
+            this.#rule.get(`view.*.*`)?.(data);
+            this.#rule.get(`*.*.*`)?.(data);
         }
 
-        result.push(data.id);
-        return result.join('-');
+        if (data.$rule !== false) {
+            this.#rule.get(`view.${collection}.id`)?.(data);
+            this.#rule.get(`view.*.id`)?.(data);
+            this.#rule.get(`*.*.id`)?.(data);
+        }
+
+        if (typeof data.id !== 'string') throw new Error('property id required');
+        const id = data.id;
+
+        return this.#fetch('GET', `/${collection}/${id}`);
     }
 
-    view<C extends string, D extends ViewData> (collection: C, data: D): Promise<Record<string, any> | null> {
-        const id = this.#id(data);
-        return this.#fetch('get', `/${collection}/${id}`);
+    remove<C extends string, D extends RemoveData> (collection: C, data: D): Promise<void> {
+
+        if (data.$rule !== false) {
+            this.#rule.get(`remove.${collection}.*`)?.(data);
+            this.#rule.get(`remove.*.*`)?.(data);
+            this.#rule.get(`*.*.*`)?.(data);
+        }
+
+        if (data.$rule !== false) {
+            this.#rule.get(`remove.${collection}.id`)?.(data);
+            this.#rule.get(`remove.*.id`)?.(data);
+            this.#rule.get(`*.*.id`)?.(data);
+        }
+
+        if (typeof data.id !== 'string') throw new Error('property id required');
+        const id = data.id;
+
+        return this.#fetch('DELETE', `/${collection}/${id}`);
     }
 
-    remove<C extends string, D extends RemoveData> (collection: C, data: D): Promise<Record<string, any>> {
-        const id = this.#id(data);
-        return this.#fetch('delete', `/${collection}/${id}`);
-    }
+    create<C extends string, D extends CreateData> (collection: C, data: D): Promise<ResultRecord> {
 
-    create<C extends string, D extends CreateData> (collection: C, data: D): Promise<Record<string, any>> {
-        data.id = data.id ?? crypto.randomUUID();
+        if (data.$rule !== false) {
+            this.#rule.get(`create.${collection}.*`)?.(data);
+            this.#rule.get(`create.*.*`)?.(data);
+            this.#rule.get(`*.*.*`)?.(data);
+        }
 
-        const constant = this.#constant.find(c => !(c in data));
-        if (constant) throw new Error(`constant required ${constant}`);
-
-        const id = this.#id(data);
         const fields: Record<string, Value> = {};
 
         for (const key in data) {
+            if (key.startsWith('$')) continue;
+            if (data.$rule !== false) {
+                this.#rule.get(`create.${collection}.${key}`)?.(data);
+                this.#rule.get(`create.*.${key}`)?.(data);
+                this.#rule.get(`*.*.${key}`)?.(data);
+            }
             const value = data[ key ];
             if (value === undefined) continue;
             fields[ key ] = ValueFormat(value, key);
         }
 
-        return this.#fetch('post', `/${collection}?documentId=${id}`, { fields });
+        const id = data.id = data.id ?? crypto.randomUUID();
+
+        return this.#fetch('POST', `/${collection}?documentId=${id}`, { fields });
     }
 
-    update<C extends string, D extends UpdateData> (collection: C, data: D): Promise<Record<string, any>> {
-        const id = this.#id(data);
+    update<C extends string, D extends UpdateData> (collection: C, data: D): Promise<ResultRecord> {
+
+        if (data.$rule !== false) {
+            this.#rule.get(`update.${collection}.*`)?.(data);
+            this.#rule.get(`update.*.*`)?.(data);
+            this.#rule.get(`*.*.*`)?.(data);
+        }
+
         const fields: Record<string, Value> = {};
 
         let query = '?currentDocument.exists=true';
         for (const key in data) {
+            if (key.startsWith('$')) continue;
+
+            if (data.$rule !== false) {
+                this.#rule.get(`update.${collection}.${key}`)?.(data);
+                this.#rule.get(`update.*.${key}`)?.(data);
+                this.#rule.get(`*.*.${key}`)?.(data);
+            }
+
+            if (key === 'id') continue;
+
             const value = data[ key ];
-
-            if (key === 'id' ||
-                key.startsWith('$') ||
-                this.#scope.includes(key) ||
-                this.#constant.includes(key)) continue;
-
             if (value !== undefined) fields[ key ] = ValueFormat(value, key);
 
             query += `&updateMask.fieldPaths=${key}`;
         }
 
-        return this.#fetch('patch', `/${collection}/${id}${query}`, { fields });
+        if (typeof data.id !== 'string') throw new Error('property id required');
+        const id = data.id;
+
+        return this.#fetch('PATCH', `/${collection}/${id}${query}`, { fields });
     }
 
     async set<C extends string, D extends SetData> (collection: C, data: D): Promise<void> {
-        data.id = data.id ?? crypto.randomUUID();
 
-        const id = this.#id(data);
+        if (data.$rule !== false) {
+            this.#rule.get(`set.${collection}.*`)?.(data);
+            this.#rule.get(`set.*.*`)?.(data);
+            this.#rule.get(`*.*.*`)?.(data);
+        }
+
         const fieldPaths: Array<string> = [];
         const fields: Record<string, Value> = {};
         const updateTransforms: Array<Record<string, string | Value>> = [];
 
         for (const key in data) {
-            const value = data[ key ];
-
             if (key.startsWith('$')) continue;
+
+            if (data.$rule !== false) {
+                this.#rule.get(`set.${collection}.${key}`)?.(data);
+                this.#rule.get(`set.*.${key}`)?.(data);
+                this.#rule.get(`*.*.${key}`)?.(data);
+            }
+
+            // if (key === 'id') continue;
+
+            const value = data[ key ];
 
             if (data.$increment === key || data.$increment?.includes(key)) {
                 updateTransforms.push({ fieldPath: key, increment: ValueFormat(value) });
@@ -311,9 +344,10 @@ export default class Database {
             fieldPaths.push(key);
         }
 
+        const id = data.id = data.id ?? crypto.randomUUID();
         const path = `projects/${this.#project}/databases/(default)/documents/${collection}/${id}`;
 
-        await this.#fetch('post', `:batchWrite`, {
+        await this.#fetch('POST', ':batchWrite', {
             writes: [ {
                 updateTransforms,
                 updateMask: { fieldPaths },
@@ -322,13 +356,12 @@ export default class Database {
         });
     }
 
-    search<C extends string, D extends SearchData> (collection: C, data: D): Promise<Array<Record<string, any>>> {
+    search<C extends string, D extends SearchData> (collection: C, data: D): Promise<ResultArray> {
 
-        if (data.$scope !== false) {
-            for (const name of this.#scope) {
-                const value = data[ name ];
-                if (!value || typeof value !== 'string') throw new Error(`scope property ${name} required`);
-            }
+        if (data.$rule !== false) {
+            this.#rule.get(`search.${collection}.*`)?.(data);
+            this.#rule.get(`search.*.*`)?.(data);
+            this.#rule.get(`*.*.*`)?.(data);
         }
 
         let where = data.$where;
@@ -340,11 +373,11 @@ export default class Database {
         const offset = data.$offset;
 
         const operator = new Proxy(typeof data.$operator === 'object' ? data.$operator : {}, {
-            get: (target, name) => OperatorFormat(target[ name as string ] ?? data.$operator)
+            get: (target, name) => OperatorFormat(target[ name as string ] ?? data.$operator ?? 'EQUAL')
         });
 
         const direction = new Proxy(typeof data.$direction === 'object' ? data.$direction : {}, {
-            get: (target, name) => DirectionFormat(target[ name as string ] ?? data.$direction)
+            get: (target, name) => DirectionFormat(target[ name as string ] ?? data.$direction ?? 'ASCENDING')
         });
 
         const token = data.$token;
@@ -360,9 +393,16 @@ export default class Database {
             const filters = [];
 
             for (const key in data) {
-                const value = data[ key ];
+                if (key.startsWith('$')) continue;
 
-                if (value === undefined || key.startsWith('$')) continue;
+                if (data.$rule !== false) {
+                    this.#rule.get(`search.${collection}.${key}`)?.(data);
+                    this.#rule.get(`search.*.${key}`)?.(data);
+                    this.#rule.get(`*.*.${key}`)?.(data);
+                }
+
+                const value = data[ key ];
+                if (value === undefined) continue;
 
                 if (operator[ key ] === 'STARTS_WITH') {
                     const start = (value as string);
@@ -401,7 +441,7 @@ export default class Database {
             }
         };
 
-        return this.#fetch('post', `:runQuery`, body);
+        return this.#fetch('POST', ':runQuery', body);
     }
 
 }

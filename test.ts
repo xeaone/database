@@ -7,6 +7,11 @@ const database = new Database();
 database.key(key);
 database.project(project);
 
+// database.rule('search', '*', 'access', (data: any) => {
+//     data.$operator = typeof data.$operator === 'string' ? {} : data.$operator;
+//     data.$operator.access = 'ARRAY_CONTAINS';
+// });
+
 const newUser = await database.create('users', { firstName: 'foo', lastName: 'bar', num: 1, p: 2.2, bool: true, n: null });
 console.log(newUser, newUser.id);
 

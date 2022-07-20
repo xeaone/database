@@ -1,6 +1,7 @@
 import {
     Operator,
     Order, Value, Direction,
+    // FieldFilterOperator, CustomFieldFilterOperator
 } from './types.ts';
 
 export const OperatorFormat = function (operator: Operator): string {
@@ -23,7 +24,7 @@ export const OperatorFormat = function (operator: Operator): string {
     else if (/^(g|greater_?than)$/i.test(operator)) return 'GREATER_THAN';
     else if (/^(ge|greater_?than_?or_?equal)$/i.test(operator)) return 'GREATER_THAN_OR_EQUAL';
 
-    else return 'EQUAL';
+    else return operator;
 };
 
 export const OrderFormat = (data: string, direction?: Direction): Order => {

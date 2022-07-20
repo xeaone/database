@@ -19,15 +19,31 @@ export type Key = {
     client_x509_cert_url?: string;
 };
 
+export type Rule = (data: any) => void;
+export type Action = '*' | 'set' | 'view' | 'search' | 'create' | 'update' | 'remove';
+export type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+
 export type Direction = 'a' | 'd' | 'ascending' | 'descending' | 'ASCENDING' | 'DESCENDING';
 
 export type Operator =
-    's' | 'startswith' | 'startsWith' | 'STARTS_WITH' |
-    'i' | 'in' | 'ni' | 'notin' | 'notIn' |
-    'e' | 'equal' | 'ne' | 'notequal' | 'notEqual' |
-    'l' | 'lessthan' | 'lessThan' | 'le' | 'lessthanorequal' | 'lessThanOrEqual' |
-    'ac' | 'arraycontains' | 'arrayContains' | 'aca' | 'arraycontainsany' | 'arrayContainsAny' |
-    'g' | 'greaterthan' | 'greaterThan' | 'ge' | 'greaterthanorequal' | 'greaterThanOrEqual';
+    's' | 'startsWith' | 'STARTS_WITH' |
+
+    'i' | 'in' | 'IN' |
+    'ni' | 'notIn' | 'NOT_IN' |
+
+    'e' | 'equal' | 'EQUAL' |
+    'ne' | 'notEqual' | 'NOT_EQUAL' |
+
+    'l' | 'lessThan' | 'LESS_THAN' |
+    'le' | 'lessThanOrEqual' | 'LESS_THAN_OR_EQUAL' |
+
+    'ac' | 'arrayContains' | 'ARRAY_CONTAINS' |
+    'aca' | 'arrayContainsAny' | 'ARRAY_CONTAINS_ANY' |
+
+    'g' | 'greaterThan' | 'GREATER_THAN' |
+    'ge' | 'greaterThanOrEqual' | 'GREATER_THAN_OR_EQUAL';
+
+export type CustomFieldFilterOperator = 'STARTS_WITH';
 
 // https://cloud.google.com/firestore/docs/reference/rest/v1/StructuredQuery#operator_1
 export type FieldFilterOperator =
@@ -51,59 +67,65 @@ export type Value =
     { bytesValue: string; } | { referenceValue: string; } |
     { arrayValue: ArrayValue; } | { geoPointValue: LatLng; } | { mapValue: MapValue; };
 
-export type From = [ { collectionId: string; } ];
+export type From = { collectionId: string; }[];
 export type FieldReference = { fieldPath: string; };
-export type StartAt = { values: Array<Value>; before?: boolean; };
+export type StartAt = { values: Value[]; before?: boolean; };
 export type Order = { field: FieldReference; direction?: Direction; };
 export type OrderBy = { field: FieldReference, direction?: Direction; }[];
 
-// export type Result = { [ key: string | number ]: string | number | boolean | Result; } | Array<string | number | boolean | Result> | null;
+// export type ResultValue = string | number | boolean | null | ResultArray | ResultRecord;
+// export type ResultArray = Array<ResultValue>;
+// export type ResultRecord = Record<string, ResultValue>;
+
+export type ResultArray = Array<any>;
+export type ResultRecord = Record<string, any>;
 
 export type RemoveData = {
     id: string;
+    $rule?: boolean;
     [ key: string ]: any;
 };
 
 export type ViewData = {
     id: string;
-    $scope?: boolean;
+    $rule?: boolean;
     [ key: string ]: any;
 };
 
 export type CreateData = {
     id?: string;
-    $scope?: boolean;
+    $rule?: boolean;
     [ key: string ]: any;
 };
 
 export type UpdateData = {
     id: string;
-    $scope?: boolean;
+    $rule?: boolean;
     [ key: string ]: any;
 };
 
 export type SetData = {
     id?: string;
-    $scope?: boolean;
+    $rule?: boolean;
     $increment?: string | string[]; // property name/s to increment
     [ key: string ]: any;
 };
 
 export type SearchData = {
 
-    $scope?: boolean;
-    $token?: { [ key: string ]: unknown; };
-    $direction?: Direction | { [ key: string ]: Direction; };
-    $operator?: Operator | { [ key: string ]: Operator; };
+    $rule?: boolean; // disable rule
+    $token?: Record<string, any>; // record to start the search pagination
+    $operator?: Operator | Record<string, Operator>; // define operators
+    $direction?: Direction | Record<string, Direction>; // order records
 
-    $where?: any; // Firestore
-    $endAt?: any; // Firestore
-    $limit?: number; // Firestore: The maximum number of results to return.
-    $offset?: number; // Firestore: The number of results to skip.
+    $where?: any; // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.where
+    $endAt?: any; // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.end_at
+    $limit?: number; // Firestore: The maximum number of results to return. https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.limit
+    $offset?: number; // Firestore: The number of results to skip. https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.offset
 
-    $from?: From; // Firestore
-    $startAt?: StartAt; // Firestore
-    $orderBy?: OrderBy; // Firestore
+    $from?: From; // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.from
+    $startAt?: StartAt; // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.start_at
+    $orderBy?: OrderBy; // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.order_by
 
     [ key: string ]: any;
 

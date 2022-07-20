@@ -37,11 +37,20 @@ console.log(user);
 
 ## API
 
-### `project(project: string)`
+### `project(project: string): this`
 Firestore project name.
 
-### `key(key: string)`
+### `key(key: string): this`
 Firestore service key.
+
+### `rule (action: Action, collection: '*' | string, name: '*' | string, method: Rule): this`
+```ts
+database.rule('create', '*', '*', data => {
+    if (!data.account || typeof data.account !== 'string') throw new Error('account string required');
+    if (!data.created || typeof data.created !== 'number') throw new Error('created number required');
+    data.id = `${data.account}.${data.id ?? crypto.randomUUID()}`;
+});
+```
 
 ### `view(collection: string, data: Record<string, any>)`
 ```ts
@@ -68,27 +77,28 @@ const user = await database.update('user', { id: '1', age: 69 });
 ### `search(collection: string, data: Record<string, any>)`
 ```ts
 const users = await database.search('user', {
-    $operator: { age: 'greaterThanOrEqual' }
     age: 69,
 
-    // $scope?: boolean;
-    // $token?: { [ key: string ]: unknown; };
-    // $direction?: Direction | { [ key: string ]: Direction; };
-    // $operator?: Operator | { [ key: string ]: Operator; };
+    /*
+    $rule?: boolean; // disable rule
+    $token?: Record<string, any>; // record to start the search pagination
+    $operator?: Operator | Record<string, Operator>; // define operators
+    $direction?: Direction | Record<string, Direction>; // order records
 
-    // $where?: any;
-    // $endAt?: any;
-    // $limit?: number;
-    // $offset?: number; //
+    $where?: any; // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.where
+    $endAt?: any; // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.end_at
+    $limit?: number; // Firestore: The maximum number of results to return. https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.limit
+    $offset?: number; // Firestore: The number of results to skip. https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.offset
 
-    // $from?: From; // firestore option
-    // $startAt?: StartAt; // firestore option
-    // $orderBy?: OrderBy;  // firestore option
+    $from?: From; // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.from
+    $startAt?: StartAt; // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.start_at
+    $orderBy?: OrderBy; // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.order_by
+    */
 
 });
 ```
 
-### `constant()`
+<!-- ### `constant()`
 - View: NA
 - Remove: NA
 - Create: Requires `constant` properties.
@@ -104,7 +114,7 @@ Creates a composite `Firestore id` using the `id` and `scope` properties. Proper
 - Create: Requires `scope` properties.
 - Update: Requires `id` and `scope` properties. Will not update `id` or `scope` properties. Throws and error if item does not exist.
 - Set: Requires `scope` properties. Will create a new item or update an existing item depending on composite `Firestore id`.
-- Search: Requires `scope`.
+- Search: Requires `scope`. -->
 
 <!--
 Firestore reset api docs
