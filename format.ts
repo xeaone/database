@@ -4,10 +4,12 @@ import {
     // FieldFilterOperator, CustomFieldFilterOperator
 } from './types.ts';
 
-export const OperatorFormat = function (operator: Operator): string {
-    if (!operator) return 'EQUAL';
+export const OperatorFormat = function (operator: string): string {
+    // if (!operator) return operator;
+    // if (!operator) return 'EQUAL';
 
-    else if (/^(s|starts_?with)$/i.test(operator)) return 'STARTS_WITH';
+    // else
+    if (/^(s|starts_?with)$/i.test(operator)) return 'STARTS_WITH';
 
     else if (/^(i|in)$/i.test(operator)) return 'IN';
     else if (/^(ni|not_?in)$/i.test(operator)) return 'NOT_IN';
@@ -24,7 +26,7 @@ export const OperatorFormat = function (operator: Operator): string {
     else if (/^(g|greater_?than)$/i.test(operator)) return 'GREATER_THAN';
     else if (/^(ge|greater_?than_?or_?equal)$/i.test(operator)) return 'GREATER_THAN_OR_EQUAL';
 
-    else return operator;
+    else throw new Error('operator not valid');
 };
 
 export const OrderFormat = (data: string, direction?: Direction): Order => {

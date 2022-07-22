@@ -10,15 +10,19 @@ import {
 import {
     Key,
     Rule,
+    From,
     Value,
     Action,
     Options,
     Method,
+    EndAt,
     ResultArray,
     ResultRecord,
     FieldFilterOperator,
-    ViewData, RemoveData, CreateData, UpdateData, SetData, SearchData
+    ViewData, RemoveData, CreateData, UpdateData, SetData, SearchData, Operator, Direction, OrderBy, StartAt, Where, FieldFilter, Filters, FieldReference, Filter, ArrayValue
 } from './types.ts';
+
+const ID = Symbol('id');
 
 export default class Database {
 
@@ -40,13 +44,65 @@ export default class Database {
         this.#project = this.#project ?? options?.project;
     }
 
-    #fieldFilter (operator: FieldFilterOperator, key: string, value: any) {
-        const type = this.#type(value);
+    #value (value: any): Value {
+        if (value === null) {
+            return { nullValue: value };
+            // } else if (value === undefined) {
+            // return { 'undefined': value };
+        } else if (typeof value === 'string') {
+            return { stringValue: value };
+        } else if (typeof value === 'boolean') {
+            return { booleanValue: value };
+        } else if (typeof value === 'number' && value % 1 !== 0) {
+            return { doubleValue: value };
+        } else if (typeof value === 'number' && value % 1 === 0) {
+            return { integerValue: `${value}` };
+        } else if (value instanceof Date) {
+            return { timestampValue: `${value}` };
+        } else if (value instanceof Array) {
+            return { arrayValue: value as any };
+        } else if (typeof value === 'object') {
+            return { mapValue: value };
+        } else {
+            throw new Error(`value not allowed ${value}`);
+        }
+    }
+
+    #order (key: string, direction?: Direction) {
+        return { field: { fieldPath: key }, direction: direction ?? 'ASCENDING' };
+    }
+
+    #filter (operator: string, key: string, value: any): FieldFilter {
+        // const type = this.#type(value);
         return {
-            op: operator,
-            field: { fieldPath: key },
-            value: { [ type ]: value },
+            fieldFilter: {
+                field: { fieldPath: key },
+                value: this.#value(value),
+                op: this.#operator(operator),
+                // value: { [ type ]: value } as Value
+            }
         };
+    }
+
+    #operator (operator: string): Operator {
+        // if (/^(s|starts_?with)$/i.test(operator)) return 'STARTS_WITH';
+        // else
+        if (/^(i|in)$/i.test(operator)) return 'IN';
+        else if (/^(ni|not_?in)$/i.test(operator)) return 'NOT_IN';
+
+        else if (/^(e|equal)$/i.test(operator)) return 'EQUAL';
+        else if (/^(ne|not_?equal)$/i.test(operator)) return 'NOT_EQUAL';
+
+        else if (/^(l|less_?than)$/i.test(operator)) return 'LESS_THAN';
+        else if (/^(le|less_?than_?or_?equal)$/i.test(operator)) return 'LESS_THAN_OR_EQUAL';
+
+        else if (/^(ac|array_?contains)$/i.test(operator)) return 'ARRAY_CONTAINS';
+        else if (/^(aca|array_?contains_?any)$/i.test(operator)) return 'ARRAY_CONTAINS_ANY';
+
+        else if (/^(g|greater_?than)$/i.test(operator)) return 'GREATER_THAN';
+        else if (/^(ge|greater_?than_?or_?equal)$/i.test(operator)) return 'GREATER_THAN_OR_EQUAL';
+
+        else throw new Error(`operator ${operator} not valid`);
     }
 
     #type (value: any) {
@@ -96,6 +152,8 @@ export default class Database {
             value = new Date(value[ property ]);
         } else if (property) {
             value = value[ property ];
+        } else if (value === undefined) {
+            return;
         } else if (typeof value === 'object') {
             Object.keys(value).forEach(key => value[ key ] = this.#parse(value[ key ]));
         }
@@ -121,14 +179,21 @@ export default class Database {
 
             return Object.defineProperties(
                 formatted,
-                { $offset: { value: skippedResults }, $skippedResults: { value: skippedResults } }
+                { $offset: { value: skippedResults }, $skippedResults: { value: skippedResults }, $id: { value: 'test' } }
             );
         } else if (result.documents) {
-            return result.documents.map((r: any) => this.#handle(r));
-        } else if (result.document) {
-            return this.#parse(result.document.fields);
-        } else if (result.fields) {
-            return this.#parse(result.fields);
+            return result.documents.map(this.#handle);
+        } else if (result.fields || result.document) {
+            return this.#parse(result.fields || result.document.fields);
+            // const fields = result.fields || result.document.fields;
+            // const name = result.name || result.document.name;
+            // const entity = this.#parse(fields);
+            // entity[ ID ] = name.split('/').slice(-1)[ 0 ];
+            // return entity;
+            // return Object.defineProperties(
+            //     this.#parse(fields),
+            //     { $id: { value: name.split('/').slice(-1)[ 0 ] } }
+            // );
         } else {
             // console.warn(result);
         }
@@ -183,14 +248,15 @@ export default class Database {
 
         const result = await response.json();
 
-        if (method === 'DELETE' && response.status === 200) return;
-        if (method === 'GET' && result?.error?.code === 404) return null;
+        // if (method === 'DELETE' && response.status === 200) return;
+        // if (method === 'GET' && result?.error?.code === 404) return null;
 
         if (result.error) {
             throw new Error(JSON.stringify(result.error, null, '\t'));
         }
 
-        return this.#handle(result);
+        // return this.#handle(result);
+        return result;
     }
 
     key (data: Key): this {
@@ -208,47 +274,7 @@ export default class Database {
         return this;
     }
 
-    view<C extends string, D extends ViewData> (collection: C, data: D): Promise<ResultRecord | null> {
-
-        if (data.$rule !== false) {
-            this.#rule.get(`view.${collection}.*`)?.(data);
-            this.#rule.get(`view.*.*`)?.(data);
-            this.#rule.get(`*.*.*`)?.(data);
-        }
-
-        if (data.$rule !== false) {
-            this.#rule.get(`view.${collection}.id`)?.(data);
-            this.#rule.get(`view.*.id`)?.(data);
-            this.#rule.get(`*.*.id`)?.(data);
-        }
-
-        if (typeof data.id !== 'string') throw new Error('property id required');
-        const id = data.id;
-
-        return this.#fetch('GET', `/${collection}/${id}`);
-    }
-
-    remove<C extends string, D extends RemoveData> (collection: C, data: D): Promise<void> {
-
-        if (data.$rule !== false) {
-            this.#rule.get(`remove.${collection}.*`)?.(data);
-            this.#rule.get(`remove.*.*`)?.(data);
-            this.#rule.get(`*.*.*`)?.(data);
-        }
-
-        if (data.$rule !== false) {
-            this.#rule.get(`remove.${collection}.id`)?.(data);
-            this.#rule.get(`remove.*.id`)?.(data);
-            this.#rule.get(`*.*.id`)?.(data);
-        }
-
-        if (typeof data.id !== 'string') throw new Error('property id required');
-        const id = data.id;
-
-        return this.#fetch('DELETE', `/${collection}/${id}`);
-    }
-
-    create<C extends string, D extends CreateData> (collection: C, data: D): Promise<ResultRecord> {
+    async create<C extends string, D extends CreateData> (collection: C, data: D): Promise<ResultRecord> {
 
         if (data.$rule !== false) {
             this.#rule.get(`create.${collection}.*`)?.(data);
@@ -270,43 +296,11 @@ export default class Database {
             fields[ key ] = ValueFormat(value, key);
         }
 
-        const id = data.id = data.id ?? crypto.randomUUID();
+        // const id = data.id = data.id ?? crypto.randomUUID();
+        // return this.#fetch('POST', `/${collection}?documentId=${id}`, { fields });
 
-        return this.#fetch('POST', `/${collection}?documentId=${id}`, { fields });
-    }
-
-    update<C extends string, D extends UpdateData> (collection: C, data: D): Promise<ResultRecord> {
-
-        if (data.$rule !== false) {
-            this.#rule.get(`update.${collection}.*`)?.(data);
-            this.#rule.get(`update.*.*`)?.(data);
-            this.#rule.get(`*.*.*`)?.(data);
-        }
-
-        const fields: Record<string, Value> = {};
-
-        let query = '?currentDocument.exists=true';
-        for (const key in data) {
-            if (key.startsWith('$')) continue;
-
-            if (data.$rule !== false) {
-                this.#rule.get(`update.${collection}.${key}`)?.(data);
-                this.#rule.get(`update.*.${key}`)?.(data);
-                this.#rule.get(`*.*.${key}`)?.(data);
-            }
-
-            if (key === 'id') continue;
-
-            const value = data[ key ];
-            if (value !== undefined) fields[ key ] = ValueFormat(value, key);
-
-            query += `&updateMask.fieldPaths=${key}`;
-        }
-
-        if (typeof data.id !== 'string') throw new Error('property id required');
-        const id = data.id;
-
-        return this.#fetch('PATCH', `/${collection}/${id}${query}`, { fields });
+        const result = await this.#fetch('POST', `/${collection}`, { fields });
+        return this.#handle(result);
     }
 
     async set<C extends string, D extends SetData> (collection: C, data: D): Promise<void> {
@@ -347,6 +341,7 @@ export default class Database {
         const id = data.id = data.id ?? crypto.randomUUID();
         const path = `projects/${this.#project}/databases/(default)/documents/${collection}/${id}`;
 
+        // might need to check results for errors
         await this.#fetch('POST', ':batchWrite', {
             writes: [ {
                 updateTransforms,
@@ -354,9 +349,170 @@ export default class Database {
                 update: { fields, name: path },
             } ]
         });
+
     }
 
-    search<C extends string, D extends SearchData> (collection: C, data: D): Promise<ResultArray> {
+    async view<C extends string, D extends ViewData> (collection: C, data: D): Promise<ResultRecord | null> {
+
+        if (data.$rule !== false) {
+            this.#rule.get(`view.${collection}.*`)?.(data);
+            this.#rule.get(`view.*.*`)?.(data);
+            this.#rule.get(`*.*.*`)?.(data);
+        }
+
+        // if (data.$id) {
+        //     const result = await this.#fetch('GET', `/${collection}/${data.$id}`);
+        // }
+
+        const filters = [];
+        for (const key in data) {
+            if (key.startsWith('$')) continue;
+
+            if (data.$rule !== false) {
+                this.#rule.get(`view.${collection}.${key}`)?.(data);
+                this.#rule.get(`view.*.${key}`)?.(data);
+                this.#rule.get(`*.*.${key}`)?.(data);
+            }
+
+            const value = data[ key ];
+            if (value === undefined) throw new Error(`View property ${key} is undefined`);
+
+            const operator = data?.$where?.[ key ];
+            if (!operator) continue;
+            if (typeof operator !== 'string') throw new Error(`View operator ${key} not valid`);
+            filters.push(this.#filter(operator, key, value));
+
+        }
+
+        const wheres = Object.keys(data?.$where ?? {});
+        if (!wheres.length) throw new Error('View $where operators required');
+        if (filters.length !== wheres.length) throw new Error(`View operator ${wheres[ 0 ]} requires property ${wheres[ 0 ]}`);
+
+        const limit = 1;
+        const from: From = [ { collectionId: collection } ];
+        const where: Where = { compositeFilter: { op: 'AND', filters } };
+        const body = { structuredQuery: { from, where, limit } };
+
+        const query = await this.#fetch('POST', ':runQuery', body);
+        const name = query[ 0 ]?.document?.name;
+        if (!name) return null;
+
+        const fields = query[ 0 ]?.document?.fields;
+
+        return fields ? this.#parse(fields) : null;
+    }
+
+    async remove<C extends string, D extends RemoveData> (collection: C, data: D): Promise<ResultRecord | null> {
+
+        if (data.$rule !== false) {
+            this.#rule.get(`remove.${collection}.*`)?.(data);
+            this.#rule.get(`remove.*.*`)?.(data);
+            this.#rule.get(`*.*.*`)?.(data);
+        }
+
+        // if (data.$id) {
+        //     return this.#fetch('DELETE', `/${collection}/${data.$id}`);
+        // }
+
+        const filters = [];
+        for (const key in data) {
+            if (key.startsWith('$')) continue;
+
+            if (data.$rule !== false) {
+                this.#rule.get(`remove.${collection}.${key}`)?.(data);
+                this.#rule.get(`remove.*.${key}`)?.(data);
+                this.#rule.get(`*.*.${key}`)?.(data);
+            }
+
+            const value = data[ key ];
+            if (value === undefined) throw new Error(`Remove property ${key} is undefined`);
+
+            const operator = data?.$where?.[ key ];
+            if (!operator) continue;
+            if (typeof operator !== 'string') throw new Error(`Remove operator ${key} not valid`);
+            filters.push(this.#filter(operator, key, value));
+
+        }
+
+        const wheres = Object.keys(data?.$where ?? {});
+        if (!wheres.length) throw new Error('Remove $where operators required');
+        if (filters.length !== wheres.length) throw new Error(`Remove operator ${wheres[ 0 ]} requires property ${wheres[ 0 ]}`);
+
+        const limit = 1;
+        const from: From = [ { collectionId: collection } ];
+        const where: Where = { compositeFilter: { op: 'AND', filters } };
+        const body = { structuredQuery: { from, where, limit } };
+
+        const query = await this.#fetch('POST', ':runQuery', body);
+        const name = query[ 0 ]?.document?.name;
+        if (!name) return null;
+
+        const id = name.split('/').slice(-1)[ 0 ];
+        await this.#fetch('DELETE', `/${collection}/${id}`);
+
+        return this.#parse(query[ 0 ]?.document?.fields);
+    }
+
+    async update<C extends string, D extends UpdateData> (collection: C, data: D): Promise<ResultRecord | null> {
+
+        if (data.$rule !== false) {
+            this.#rule.get(`update.${collection}.*`)?.(data);
+            this.#rule.get(`update.*.*`)?.(data);
+            this.#rule.get(`*.*.*`)?.(data);
+        }
+
+        // if (data.$id) {
+        // }
+
+        const filters = [];
+        const fields: Record<string, Value> = {};
+        let mask = '?currentDocument.exists=true';
+
+        for (const key in data) {
+            if (key.startsWith('$')) continue;
+
+            if (data.$rule !== false) {
+                this.#rule.get(`update.${collection}.${key}`)?.(data);
+                this.#rule.get(`update.*.${key}`)?.(data);
+                this.#rule.get(`*.*.${key}`)?.(data);
+            }
+
+            mask += `&updateMask.fieldPaths=${key}`;
+
+            const value = data[ key ];
+            if (value === undefined) continue;
+
+            fields[ key ] = ValueFormat(value, key);
+
+            const operator = data?.$where?.[ key ];
+            if (!operator) continue;
+            // maybe error for no value
+            if (typeof operator !== 'string') throw new Error(`Update operator ${key} not valid`);
+            filters.push(this.#filter(operator, key, value));
+
+        }
+
+        const wheres = Object.keys(data?.$where ?? {});
+        if (!wheres.length) throw new Error('Update $where operators required');
+        if (filters.length !== wheres.length) throw new Error(`Update operator ${wheres[ 0 ]} requires property ${wheres[ 0 ]}`);
+
+        const limit = 1;
+        const from: From = [ { collectionId: collection } ];
+        const where: Where = { compositeFilter: { op: 'AND', filters } };
+        const body = { structuredQuery: { from, where, limit } };
+
+        const query = await this.#fetch('POST', ':runQuery', body);
+        const name = query[ 0 ]?.document?.name;
+        if (!name) return null;
+
+        const id = name.split('/').slice(-1)[ 0 ];
+        const patch = await this.#fetch('PATCH', `/${collection}/${id}${mask}`, { fields });
+        if (!patch.field) return null;
+
+        return this.#parse(patch?.fields);
+    }
+
+    async search<C extends string, D extends SearchData> (collection: C, data: D): Promise<ResultArray> {
 
         if (data.$rule !== false) {
             this.#rule.get(`search.${collection}.*`)?.(data);
@@ -364,84 +520,65 @@ export default class Database {
             this.#rule.get(`*.*.*`)?.(data);
         }
 
-        let where = data.$where;
-        let orderBy = data.$orderBy;
-        let startAt = data.$startAt;
-
-        const limit = data.$limit;
-        const endAt = data.$endAt;
-        const offset = data.$offset;
-
-        const operator = new Proxy(typeof data.$operator === 'object' ? data.$operator : {}, {
-            get: (target, name) => OperatorFormat(target[ name as string ] ?? data.$operator ?? 'EQUAL')
-        });
-
-        const direction = new Proxy(typeof data.$direction === 'object' ? data.$direction : {}, {
-            get: (target, name) => DirectionFormat(target[ name as string ] ?? data.$direction ?? 'ASCENDING')
-        });
+        let orderBy: OrderBy | undefined;
+        let startAt: StartAt | undefined;
+        let endAt: EndAt | undefined;
 
         const token = data.$token;
         for (const name in token) {
             const value = token[ name ];
             orderBy = orderBy ?? [];
             startAt = startAt ?? { values: [] };
-            orderBy?.push(OrderFormat(name));
-            startAt?.values.push(ValueFormat(value));
+            orderBy.push(this.#order(name, data?.$order?.[ name ]));
+            startAt.values.push(ValueFormat(value));
         }
 
-        if (!where) {
-            const filters = [];
+        const filters: Filters = [];
+        for (const key in data) {
+            if (key.startsWith('$')) continue;
 
-            for (const key in data) {
-                if (key.startsWith('$')) continue;
-
-                if (data.$rule !== false) {
-                    this.#rule.get(`search.${collection}.${key}`)?.(data);
-                    this.#rule.get(`search.*.${key}`)?.(data);
-                    this.#rule.get(`*.*.${key}`)?.(data);
-                }
-
-                const value = data[ key ];
-                if (value === undefined) continue;
-
-                if (operator[ key ] === 'STARTS_WITH') {
-                    const start = (value as string);
-                    const length = start.length;
-                    const startPart = start.slice(0, length - 1);
-                    const endPart = start.slice(length - 1, length);
-                    const end = startPart + String.fromCharCode(endPart.charCodeAt(0) + 1);
-                    orderBy = orderBy ?? [];
-                    orderBy?.push(OrderFormat(key, direction[ key ]));
-                    filters.push({ fieldFilter: this.#fieldFilter('GREATER_THAN_OR_EQUAL', key, start) });
-                    filters.push({ fieldFilter: this.#fieldFilter('LESS_THAN', key, end) });
-                    continue;
-                }
-
-                filters.push({ fieldFilter: this.#fieldFilter(operator[ key ] as FieldFilterOperator, key, value) });
+            if (data.$rule !== false) {
+                this.#rule.get(`search.${collection}.${key}`)?.(data);
+                this.#rule.get(`search.*.${key}`)?.(data);
+                this.#rule.get(`*.*.${key}`)?.(data);
             }
 
-            if (filters.length) {
-                where = { compositeFilter: { op: 'AND', filters } };
+            const value = data[ key ];
+            if (value === undefined) throw new Error(`Search property ${key} is undefined`);
+
+            const operator = data?.$where?.[ key ];
+            if (!operator) continue;
+            if (typeof operator !== 'string') throw new Error(`Search operator ${key} not valid`);
+
+            if (/^(s(a|d)?|starts_?with_?(ascending|descending)?)$/i.test(operator)) {
+                const start = (value as string);
+                const length = start.length;
+                const startPart = start.slice(0, length - 1);
+                const endPart = start.slice(length - 1, length);
+                const end = startPart + String.fromCharCode(endPart.charCodeAt(0) + 1);
+                const direction = data?.$order?.[ key ];
+                orderBy = orderBy ?? [];
+                orderBy.push(this.#order(key, direction));
+                filters.push(this.#filter('GREATER_THAN_OR_EQUAL', key, start));
+                filters.push(this.#filter('LESS_THAN', key, end));
+                continue;
             }
 
+            filters.push(this.#filter(operator, key, value));
         }
 
-        let from;
-        if ('$from' in data) {
-            from = data.$from;
-        } else {
-            from = [ { collectionId: collection } ];
-        }
+        const wheres = Object.keys(data?.$where ?? {});
+        if (!wheres.length) throw new Error('Search $where operators required');
+        if (filters.length !== wheres.length) throw new Error(`Search operator ${wheres[ 0 ]} requires property ${wheres[ 0 ]}`);
 
-        const body = {
-            structuredQuery: {
-                from, where,
-                limit, offset,
-                orderBy, startAt, endAt
-            }
-        };
+        const limit: number = data.$limit;
+        const offset: number = data.$offset;
+        const from: From = [ { collectionId: collection } ];
+        const where: Where = { compositeFilter: { op: 'AND', filters } };
+        const body = { structuredQuery: { from, where, limit, offset, orderBy, startAt, endAt } };
 
-        return this.#fetch('POST', ':runQuery', body);
+        const query = await this.#fetch('POST', ':runQuery', body);
+        return this.#handle(query);
     }
 
 }

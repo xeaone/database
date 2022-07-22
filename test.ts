@@ -1,22 +1,53 @@
 import Database from './mod.ts';
 
-const project = Deno.env.get('FIRESTORE_PROJECT') ?? '';
-const key = JSON.parse(Deno.env.get('FIRESTORE_KEY') ?? '');
+// # FIRESTORE_PROJECT="echos-344816" \
+// # FIRESTORE_KEY=`cat ../FirestoreKey.json` \
+
+const compare = function (a: any, b: any) {
+    a = a ?? {};
+    b = b ?? {};
+    const ak = Object.keys(a).sort().join(' ');
+    const bk = Object.keys(b).sort().join(' ');
+    const av = Object.values(a).sort().join(' ');
+    const bv = Object.values(b).sort().join(' ');
+    return ak === bk && av === bv;
+};
+
+const project = 'qapi-351917';
+const key = JSON.parse(Deno.readTextFileSync('/home/alex/.qapi-credentials/qapi-dev-key.json'));
 
 const database = new Database();
 database.key(key);
 database.project(project);
 
-// database.rule('search', '*', 'access', (data: any) => {
-//     data.$operator = typeof data.$operator === 'string' ? {} : data.$operator;
-//     data.$operator.access = 'ARRAY_CONTAINS';
-// });
+database.rule('update', '*', '*', (data: any) => {
+    Object.defineProperty(data, '$where', { value: { id: 'e', account: 'e' } });
+});
 
-const newUser = await database.create('users', { firstName: 'foo', lastName: 'bar', num: 1, p: 2.2, bool: true, n: null });
-console.log(newUser, newUser.id);
+database.rule('view', '*', '*', (data: any) => {
+    Object.defineProperty(data, '$where', { value: { id: 'e', account: 'e' } });
+});
 
-// const users = await database.view('users');
-// console.log(users);
+database.rule('search', '*', '*', (data: any) => {
+    Object.defineProperty(data, '$where', { value: { account: 'e' } });
+});
+
+const user: any = { id: '1', account: '1', firstName: 'foo', lastName: 'bar', num: 1, p: 2.2, bool: true, n: null };
+
+// const createUser = await database.create('users', user);
+
+const viewUser = await database.view('users', { id: user.id, account: user.account });
+console.log('view', compare(viewUser, user));
+
+user.num = 99;
+const updateUser = await database.update('users', user);
+console.log('update', compare(updateUser, user), updateUser);
+
+// const removeUser = await database.remove('users', { id: user.id });
+// console.log('remove', compare(removeUser, user), removeUser);
+
+// const searchUser = await database.search('users', { account: '1' });
+// console.log('search', searchUser);
 
 // users[ 0 ].p = undefined;
 // users[ 0 ].firstName = 'foo';
@@ -33,17 +64,16 @@ console.log(newUser, newUser.id);
 // }, 'users');
 // console.log(s);
 
-const r = await database.search('users', {
-    firstName: 'foo',
-    $limit: 10,
-    $offset: 1,
-    $orderBy: [ { field: { fieldPath: 'index' } } ],
-});
-console.log(r);
 
+
+// const r = await database.search('users', {
+//     firstName: 'foo',
+//     $limit: 10,
+//     $offset: 1,
+//     $orderBy: [ { field: { fieldPath: 'index' } } ],
+// });
+// console.log(r);
 
 
 // const user = await database.view('users', newUser[ database.ID ]);
 // console.log(user, user[ database.ID ], user[ database.PATH ]);
-
-
