@@ -274,6 +274,7 @@ export default class Database {
         return this;
     }
 
+    // review and test
     async create<C extends string, D extends CreateData> (collection: C, data: D): Promise<ResultRecord> {
 
         if (data.$rule !== false) {
@@ -303,6 +304,7 @@ export default class Database {
         return this.#handle(result);
     }
 
+    // review and test
     async set<C extends string, D extends SetData> (collection: C, data: D): Promise<void> {
 
         if (data.$rule !== false) {
