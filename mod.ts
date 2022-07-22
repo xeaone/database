@@ -486,7 +486,6 @@ export default class Database {
 
             const operator = data?.$where?.[ key ];
             if (!operator) continue;
-            // maybe error for no value
             if (typeof operator !== 'string') throw new Error(`Update - operator ${key} invalid`);
             filters.push(this.#filter(operator, key, value));
 
