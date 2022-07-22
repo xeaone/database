@@ -20,6 +20,10 @@ const database = new Database();
 database.key(key);
 database.project(project);
 
+database.rule('remove', '*', '*', (data: any) => {
+    Object.defineProperty(data, '$where', { value: { id: 'e', account: 'e' } });
+});
+
 database.rule('update', '*', '*', (data: any) => {
     Object.defineProperty(data, '$where', { value: { id: 'e', account: 'e' } });
 });
@@ -40,11 +44,13 @@ const viewUser = await database.view('users', { id: user.id, account: user.accou
 console.log('view', compare(viewUser, user));
 
 user.num = 99;
+user.n = undefined;
 const updateUser = await database.update('users', user);
+delete user.n;
 console.log('update', compare(updateUser, user), updateUser);
 
-// const removeUser = await database.remove('users', { id: user.id });
-// console.log('remove', compare(removeUser, user), removeUser);
+const removeUser = await database.remove('users', { id: user.id });
+console.log('remove', compare(removeUser, user));
 
 // const searchUser = await database.search('users', { account: '1' });
 // console.log('search', searchUser);

@@ -375,18 +375,18 @@ export default class Database {
             }
 
             const value = data[ key ];
-            if (value === undefined) throw new Error(`View property ${key} is undefined`);
+            if (value === undefined) throw new Error(`View - property ${key} undefined`);
 
             const operator = data?.$where?.[ key ];
             if (!operator) continue;
-            if (typeof operator !== 'string') throw new Error(`View operator ${key} not valid`);
+            if (typeof operator !== 'string') throw new Error(`View - operator ${key} invalid`);
             filters.push(this.#filter(operator, key, value));
 
         }
 
         const wheres = Object.keys(data?.$where ?? {});
-        if (!wheres.length) throw new Error('View $where operators required');
-        if (filters.length !== wheres.length) throw new Error(`View operator ${wheres[ 0 ]} requires property ${wheres[ 0 ]}`);
+        if (!wheres.length) throw new Error('View - operators required');
+        if (filters.length !== wheres.length) throw new Error(`View - properties required ${wheres.join(', ')}`);
 
         const limit = 1;
         const from: From = [ { collectionId: collection } ];
@@ -425,18 +425,18 @@ export default class Database {
             }
 
             const value = data[ key ];
-            if (value === undefined) throw new Error(`Remove property ${key} is undefined`);
+            if (value === undefined) throw new Error(`Remove - property ${key} undefined`);
 
             const operator = data?.$where?.[ key ];
             if (!operator) continue;
-            if (typeof operator !== 'string') throw new Error(`Remove operator ${key} not valid`);
+            if (typeof operator !== 'string') throw new Error(`Remove - operator ${key} invalid`);
             filters.push(this.#filter(operator, key, value));
 
         }
 
         const wheres = Object.keys(data?.$where ?? {});
-        if (!wheres.length) throw new Error('Remove $where operators required');
-        if (filters.length !== wheres.length) throw new Error(`Remove operator ${wheres[ 0 ]} requires property ${wheres[ 0 ]}`);
+        if (!wheres.length) throw new Error('Remove - operator/s required');
+        if (filters.length !== wheres.length) throw new Error(`Remove - properties required ${wheres.join(', ')}`);
 
         const limit = 1;
         const from: From = [ { collectionId: collection } ];
@@ -487,14 +487,14 @@ export default class Database {
             const operator = data?.$where?.[ key ];
             if (!operator) continue;
             // maybe error for no value
-            if (typeof operator !== 'string') throw new Error(`Update operator ${key} not valid`);
+            if (typeof operator !== 'string') throw new Error(`Update - operator ${key} invalid`);
             filters.push(this.#filter(operator, key, value));
 
         }
 
         const wheres = Object.keys(data?.$where ?? {});
-        if (!wheres.length) throw new Error('Update $where operators required');
-        if (filters.length !== wheres.length) throw new Error(`Update operator ${wheres[ 0 ]} requires property ${wheres[ 0 ]}`);
+        if (!wheres.length) throw new Error('Update - operators required');
+        if (filters.length !== wheres.length) throw new Error(`Update - properties required ${wheres.join(', ')}`);
 
         const limit = 1;
         const from: From = [ { collectionId: collection } ];
@@ -507,7 +507,8 @@ export default class Database {
 
         const id = name.split('/').slice(-1)[ 0 ];
         const patch = await this.#fetch('PATCH', `/${collection}/${id}${mask}`, { fields });
-        if (!patch.field) return null;
+
+        if (!patch.fields) return null;
 
         return this.#parse(patch?.fields);
     }
@@ -544,11 +545,11 @@ export default class Database {
             }
 
             const value = data[ key ];
-            if (value === undefined) throw new Error(`Search property ${key} is undefined`);
+            if (value === undefined) throw new Error(`Search - property ${key} undefined`);
 
             const operator = data?.$where?.[ key ];
             if (!operator) continue;
-            if (typeof operator !== 'string') throw new Error(`Search operator ${key} not valid`);
+            if (typeof operator !== 'string') throw new Error(`Search - operator ${key} invalid`);
 
             if (/^(s(a|d)?|starts_?with_?(ascending|descending)?)$/i.test(operator)) {
                 const start = (value as string);
@@ -568,8 +569,8 @@ export default class Database {
         }
 
         const wheres = Object.keys(data?.$where ?? {});
-        if (!wheres.length) throw new Error('Search $where operators required');
-        if (filters.length !== wheres.length) throw new Error(`Search operator ${wheres[ 0 ]} requires property ${wheres[ 0 ]}`);
+        if (!wheres.length) throw new Error('Search - operators required');
+        if (filters.length !== wheres.length) throw new Error(`Search - properties required ${wheres.join(', ')}`);
 
         const limit: number = data.$limit;
         const offset: number = data.$offset;
