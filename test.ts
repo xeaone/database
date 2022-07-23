@@ -13,6 +13,7 @@ const compare = function (a: any, b: any) {
     return ak === bk && av === bv;
 };
 
+const collection = 'users';
 const project = 'qapi-351917';
 const key = JSON.parse(Deno.readTextFileSync('/home/alex/.qapi-credentials/qapi-dev-key.json'));
 
@@ -20,40 +21,46 @@ const database = new Database();
 database.key(key);
 database.project(project);
 
-database.rule('remove', '*', '*', (data: any) => {
-    Object.defineProperty(data, '$where', { value: { id: 'e', account: 'e' } });
+database.rule('create', '*', '*', (data, options) => {
+    options.where = { id: 'e', account: 'e' };
 });
 
-database.rule('update', '*', '*', (data: any) => {
-    Object.defineProperty(data, '$where', { value: { id: 'e', account: 'e' } });
+database.rule('remove', '*', '*', (data, options) => {
+    options.where = { id: 'e', account: 'e' };
 });
 
-database.rule('view', '*', '*', (data: any) => {
-    Object.defineProperty(data, '$where', { value: { id: 'e', account: 'e' } });
+database.rule('update', '*', '*', (data, options) => {
+    options.where = { id: 'e', account: 'e' };
 });
 
-database.rule('search', '*', '*', (data: any) => {
-    Object.defineProperty(data, '$where', { value: { account: 'e' } });
+database.rule('view', '*', '*', (data, options) => {
+    options.where = { id: 'e', account: 'e' };
+});
+
+database.rule('search', '*', '*', (data, options) => {
+    options.where = { account: 'e' };
 });
 
 const user: any = { id: '1', account: '1', firstName: 'foo', lastName: 'bar', num: 1, p: 2.2, bool: true, n: null };
 
-// const createUser = await database.create('users', user);
+const createUser = await database.create(collection, user);
+if (!createUser) console.log('Create:', 'user already exists');
+else console.log('Create:', 'user did not exist');
 
-const viewUser = await database.view('users', { id: user.id, account: user.account });
+const viewUser = await database.view(collection, { id: user.id, account: user.account });
 console.log('view', compare(viewUser, user));
 
 user.num = 99;
 user.n = undefined;
-const updateUser = await database.update('users', user);
+const updateUser = await database.update(collection, user);
 delete user.n;
 console.log('update', compare(updateUser, user), updateUser);
 
-const removeUser = await database.remove('users', { id: user.id });
-console.log('remove', compare(removeUser, user));
+const searchUser = await database.search(collection, { account: user.account });
+console.log('search', searchUser);
 
-// const searchUser = await database.search('users', { account: '1' });
-// console.log('search', searchUser);
+const removeUser = await database.remove(collection, { id: user.id, account: user.account });
+console.log('remove', compare(removeUser, user));
 
 // users[ 0 ].p = undefined;
 // users[ 0 ].firstName = 'foo';
