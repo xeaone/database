@@ -110,7 +110,7 @@ export default class Database {
             value = { latitude: 0, longitude: 0, ...value[ property ] };
         } else if (property === 'timestampValue') {
             value = new Date(value[ property ]);
-        } else if (property) {
+        } else if (property === 'stringValue') {
             value = value[ property ];
         } else if (value === undefined) {
             return;
