@@ -4,8 +4,7 @@ import {
     Key,
     From,
     Value,
-    Data,
-    Options,
+    Data, Options,
     Rule, Method, Action,
     ResultArray, ResultRecord,
     EndAt, OrderBy, StartAt, Where, FieldFilter, Filters, Order, OrderDirection, FieldFilterOperator,
@@ -37,7 +36,6 @@ export default class Database {
     }
 
     #operator (operator: string): FieldFilterOperator {
-        // if (/^(s|starts_?with)$/i.test(operator)) return 'STARTS_WITH';
 
         if (/^i|in$/i.test(operator)) return 'IN';
         if (/^ni|not_?in$/i.test(operator)) return 'NOT_IN';
@@ -58,16 +56,6 @@ export default class Database {
     }
 
     #value (value: any): Value {
-        // if (value === null) return { nullValue: value };
-        // // if (value === undefined) return { 'undefined': value };
-        // if (typeof value === 'string') return { stringValue: value };
-        // if (typeof value === 'boolean') return { booleanValue: value };
-        // if (typeof value === 'number' && value % 1 !== 0) return { doubleValue: value };
-        // if (typeof value === 'number' && value % 1 === 0) return { integerValue: `${value}` };
-        // if (value instanceof Date) return { timestampValue: `${value}` };
-        // if (value instanceof Array) return { arrayValue: value as any };
-        // if (typeof value === 'object') return { mapValue: value };
-        // throw new Error(`value not allowed ${value}`);
         if (value === null)
             return { nullValue: value };
         if (typeof value === 'string')
@@ -100,30 +88,6 @@ export default class Database {
             }
         };
     }
-
-    // #type (value: any) {
-    //     if (value === null) {
-    //         return 'nullValue';
-    //     } else if (value === undefined) {
-    //         return 'undefined';
-    //     } else if (typeof value === 'string') {
-    //         return 'stringValue';
-    //     } else if (typeof value === 'boolean') {
-    //         return 'booleanValue';
-    //     } else if (typeof value === 'number' && value % 1 !== 0) {
-    //         return 'doubleValue';
-    //     } else if (typeof value === 'number' && value % 1 === 0) {
-    //         return 'integerValue';
-    //     } else if (value instanceof Date) {
-    //         return 'timestampValue';
-    //     } else if (value instanceof Array) {
-    //         return 'arrayValue';
-    //     } else if (typeof value === 'object') {
-    //         return 'mapValue';
-    //     } else {
-    //         throw new Error(`value not allowed ${value}`);
-    //     }
-    // }
 
     #property (value: any) {
         return Object.keys(value).find(key => this.#properties.includes(key));
@@ -300,7 +264,6 @@ export default class Database {
         const updateTransforms: Array<Record<string, string | Value>> = [];
 
         for (const key in data) {
-            if (key.startsWith('$')) continue;
 
             if (options.rule !== false) {
                 this.#rule.get(`set.${collection}.${key}`)?.(data, options);
@@ -347,7 +310,6 @@ export default class Database {
         const filters = [];
         const fields: Record<string, Value> = {};
         for (const key in data) {
-            if (key.startsWith('$')) continue;
 
             if (options.rule !== false) {
                 this.#rule.get(`create.${collection}.${key}`)?.(data, options);
@@ -392,7 +354,6 @@ export default class Database {
 
         const filters = [];
         for (const key in data) {
-            if (key.startsWith('$')) continue;
 
             if (options.rule !== false) {
                 this.#rule.get(`remove.${collection}.${key}`)?.(data, options);
@@ -437,7 +398,6 @@ export default class Database {
 
         const filters = [];
         for (const key in data) {
-            if (key.startsWith('$')) continue;
 
             if (options.rule !== false) {
                 this.#rule.get(`view.${collection}.${key}`)?.(data, options);
@@ -482,7 +442,6 @@ export default class Database {
         let mask = '?currentDocument.exists=true';
 
         for (const key in data) {
-            if (key.startsWith('$')) continue;
 
             if (options.rule !== false) {
                 this.#rule.get(`update.${collection}.${key}`)?.(data, options);
@@ -548,7 +507,6 @@ export default class Database {
 
         const filters: Filters = [];
         for (const key in data) {
-            if (key.startsWith('$')) continue;
 
             if (options.rule !== false) {
                 this.#rule.get(`search.${collection}.${key}`)?.(data, options);
