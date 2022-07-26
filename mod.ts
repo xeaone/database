@@ -4,10 +4,11 @@ import {
     Key,
     From,
     Value,
-    Data, Options,
+    Data,
+    Direction,
     Rule, Method, Action,
     ResultArray, ResultRecord,
-    EndAt, OrderBy, StartAt, Where, FieldFilter, Filters, Order, OrderDirection, FieldFilterOperator,
+    EndAt, OrderBy, StartAt, Where, FieldFilter, Filters, Order, Options, Operator,
 } from './types.ts';
 
 export default class Database {
@@ -24,35 +25,9 @@ export default class Database {
         'mapValue', 'nullValue', 'referenceValue', 'stringValue', 'timestampValue'
     ];
 
-    // constructor (options?: Options) {
-    //     this.#key = this.#key ?? options?.key;
-    //     this.#project = this.#project ?? options?.project;
-    // }
-
-    #direction (direction: string): OrderDirection {
-        if (/^a|ascending$/i.test(direction)) return 'ASCENDING';
-        if (/^d|descending$/i.test(direction)) return 'DESCENDING';
-        throw new Error(`direction ${direction} not valid`);
-    }
-
-    #operator (operator: string): FieldFilterOperator {
-
-        if (/^i|in$/i.test(operator)) return 'IN';
-        if (/^ni|not_?in$/i.test(operator)) return 'NOT_IN';
-
-        if (/^e|equal$/i.test(operator)) return 'EQUAL';
-        if (/^ne|not_?equal$/i.test(operator)) return 'NOT_EQUAL';
-
-        if (/^l|less_?than$/i.test(operator)) return 'LESS_THAN';
-        if (/^le|less_?than_?or_?equal$/i.test(operator)) return 'LESS_THAN_OR_EQUAL';
-
-        if (/^ac|array_?contains$/i.test(operator)) return 'ARRAY_CONTAINS';
-        if (/^aca|array_?contains_?any$/i.test(operator)) return 'ARRAY_CONTAINS_ANY';
-
-        if (/^g|greater_?than$/i.test(operator)) return 'GREATER_THAN';
-        if (/^ge|greater_?than_?or_?equal$/i.test(operator)) return 'GREATER_THAN_OR_EQUAL';
-
-        throw new Error(`operator ${operator} not valid`);
+    constructor (options?: Options) {
+        this.#key = this.#key ?? options?.key;
+        this.#project = this.#project ?? options?.project;
     }
 
     #value (value: any): Value {
@@ -75,95 +50,78 @@ export default class Database {
         throw new Error(`value not allowed ${value}`);
     }
 
-    #order (key: string, direction: string): Order {
-        return { field: { fieldPath: key }, direction: this.#direction(direction) };
+    #order (key: string, direction: Direction): Order {
+        return { field: { fieldPath: key }, direction };
     }
 
-    #filter (operator: string, key: string, value: any): FieldFilter {
+    #filter (operator: Operator, key: string, value: any): FieldFilter {
         return {
             fieldFilter: {
+                op: operator,
                 field: { fieldPath: key },
                 value: this.#value(value),
-                op: this.#operator(operator),
             }
         };
     }
 
-    #property (value: any) {
-        return Object.keys(value).find(key => this.#properties.includes(key));
-    }
-
-    #parse (value: any) {
-        const property = this.#property(value);
+    #parse (value: any): any {
+        const property = Object.keys(value).find(key => this.#properties.includes(key));
 
         if (property === 'nullValue') {
             value = null;
+        } else if (property === 'booleanValue') {
+            return value[ property ];
         } else if (property === 'integerValue') {
-            value = Number(value[ property ]);
+            return Number(value[ property ]);
         } else if (property === 'doubleValue') {
-            value = value[ property ];
+            return value[ property ];
         } else if (property === 'arrayValue') {
-            value = (value[ property ] && value[ property ].values || []).map(this.#parse.bind(this));
+            return (value[ property ] && value[ property ].values || []).map(this.#parse.bind(this));
         } else if (property === 'mapValue') {
-            value = this.#parse(value[ property ] && value[ property ].fields || {});
+            return this.#parse(value[ property ] && value[ property ].fields || {});
         } else if (property === 'geoPointValue') {
-            value = { latitude: 0, longitude: 0, ...value[ property ] };
+            return { latitude: 0, longitude: 0, ...value[ property ] };
         } else if (property === 'timestampValue') {
-            value = new Date(value[ property ]);
+            return new Date(value[ property ]);
         } else if (property === 'stringValue') {
-            value = value[ property ];
+            return value[ property ];
         } else if (value === undefined) {
-            return;
+            return undefined;
+        } else if (property === 'referenceValue' || property === 'byteValue') {
+            throw new Error(`${property} not implenmeted yet`);
         } else if (typeof value === 'object') {
+            console.log(value);
             Object.keys(value).forEach(key => value[ key ] = this.#parse(value[ key ]));
         }
 
         return value;
     }
 
-    // #handle (result: any): any {
+    async #query (collection: string, data: Data) {
+        const filters: Filters = [];
 
-    //     if (result.error) {
-    //         throw new Error(JSON.stringify(result.error, null, '\t'));
-    //     }
+        data.$startsWith?.forEach(key => {
+            const start = data[ key ];
+            const length = start.length;
+            const startPart = start.slice(0, length - 1);
+            const endPart = start.slice(length - 1, length);
+            const end = startPart + String.fromCharCode(endPart.charCodeAt(0) + 1);
+            filters.push(this.#filter('GREATER_THAN_OR_EQUAL', key, start));
+            filters.push(this.#filter('LESS_THAN', key, end));
+        });
 
-    //     if (result instanceof Array) {
-    //         const skippedResults = result[ 0 ] && 'skippedResults' in result[ 0 ] ?
-    //             result.splice(0, 1)[ 0 ].skippedResults : undefined;
+        data.$in?.forEach(key => filters.push(this.#filter('IN', key, data[ key ])));
+        data.$notIn?.forEach(key => filters.push(this.#filter('NOT_IN', key, data[ key ])));
+        data.$equal?.forEach(key => filters.push(this.#filter('EQUAL', key, data[ key ])));
+        data.$notEqual?.forEach(key => filters.push(this.#filter('NOT_EQUAL', key, data[ key ])));
+        data.$lessThan?.forEach(key => filters.push(this.#filter('LESS_THAN', key, data[ key ])));
+        data.$lessThanOrEqual?.forEach(key => filters.push(this.#filter('LESS_THAN_OR_EQUAL', key, data[ key ])));
+        data.$arrayContains?.forEach(key => filters.push(this.#filter('ARRAY_CONTAINS', key, data[ key ])));
+        data.$arrayContainsAny?.forEach(key => filters.push(this.#filter('ARRAY_CONTAINS_ANY', key, data[ key ])));
+        data.$greaterThan?.forEach(key => filters.push(this.#filter('GREATER_THAN', key, data[ key ])));
+        data.$greaterThanOrEqual?.forEach(key => filters.push(this.#filter('GREATER_THAN_OR_EQUAL', key, data[ key ])));
 
-    //         const formatted = [];
-    //         for (const r of result) {
-    //             const h = this.#handle(r);
-    //             if (h) formatted.push(h);
-    //         }
-
-    //         return Object.defineProperties(
-    //             formatted,
-    //             { $offset: { value: skippedResults }, $skippedResults: { value: skippedResults }, $id: { value: 'test' } }
-    //         );
-    //     } else if (result.documents) {
-    //         return result.documents.map(this.#handle);
-    //     } else if (result.fields || result.document) {
-    //         return this.#parse(result.fields || result.document.fields);
-    //         // const fields = result.fields || result.document.fields;
-    //         // const name = result.name || result.document.name;
-    //         // const entity = this.#parse(fields);
-    //         // entity[ ID ] = name.split('/').slice(-1)[ 0 ];
-    //         // return entity;
-    //         // return Object.defineProperties(
-    //         //     this.#parse(fields),
-    //         //     { $id: { value: name.split('/').slice(-1)[ 0 ] } }
-    //         // );
-    //     } else {
-    //         // console.warn(result);
-    //     }
-
-    // }
-
-    async #where (action: string, collection: string, options: any, filters: any[]) {
-        const wheres = Object.keys(options.where);
-        if (!wheres.length) throw new Error(`${action} - operators required`);
-        if (filters.length !== wheres.length) throw new Error(`${action} - properties required ${wheres.join(', ')}`);
+        if (!filters.length) throw new Error('Query - requires filters');
 
         const limit = 1;
         const from: From = [ { collectionId: collection } ];
@@ -171,8 +129,12 @@ export default class Database {
         const body = { structuredQuery: { from, where, limit } };
         const query = await this.#fetch('POST', ':runQuery', body);
 
-        const name = query?.[ 0 ]?.document?.name ?? null;
-        const result = query?.[ 0 ]?.document?.fields ?? null;
+        const error = query[ 0 ]?.error;
+        if (error) throw new Error(JSON.stringify(error, null, '\t'));
+
+        const document = query[ 0 ]?.document;
+        const name = document?.name ?? null;
+        const result = document?.fields ?? null;
 
         return { name, result };
     }
@@ -226,7 +188,7 @@ export default class Database {
         const result = await response.json();
 
         // if (method === 'DELETE' && response.status === 200) return;
-        // if (method === 'GET' && result?.error?.code === 404) return null;
+        if (method === 'GET' && result?.error?.code === 404) return null;
 
         if (result.error) {
             throw new Error(JSON.stringify(result.error, null, '\t'));
@@ -250,92 +212,88 @@ export default class Database {
         return this;
     }
 
-    // review and test
-    async set<C extends string, D extends Data, O extends Options> (collection: C, data: D, options: O = <O>{}): Promise<void> {
+    async set<C extends string, D extends Data> (collection: C, data: D): Promise<void> {
+        data = { ...data };
 
-        if (options.rule !== false) {
-            this.#rule.get(`set.${collection}.*`)?.(data, options);
-            this.#rule.get(`set.*.*`)?.(data, options);
-            this.#rule.get(`*.*.*`)?.(data, options);
+        if (data.$rule !== false) {
+            this.#rule.get(`set.${collection}.*`)?.(data);
+            this.#rule.get(`set.*.*`)?.(data);
+            this.#rule.get(`*.*.*`)?.(data);
         }
 
         const fieldPaths: Array<string> = [];
         const fields: Record<string, Value> = {};
-        const updateTransforms: Array<Record<string, string | Value>> = [];
+        let updateTransforms: Array<Record<string, string | Value>> | undefined;
 
         for (const key in data) {
 
-            if (options.rule !== false) {
-                this.#rule.get(`set.${collection}.${key}`)?.(data, options);
-                this.#rule.get(`set.*.${key}`)?.(data, options);
-                this.#rule.get(`*.*.${key}`)?.(data, options);
+            if (data.$rule !== false) {
+                this.#rule.get(`set.${collection}.${key}`)?.(data);
+                this.#rule.get(`set.*.${key}`)?.(data);
+                this.#rule.get(`*.*.${key}`)?.(data);
             }
 
-            // if (key === 'id') continue;
-
             const value = data[ key ];
+            if (value === undefined) throw new Error(`Set - property ${key} undefined`);
 
-            if (options.increment === key || options.increment?.includes(key)) {
+            if (data.$append?.includes(key)) {
+                updateTransforms = updateTransforms ?? [];
+                updateTransforms.push({ fieldPath: key, appendMissingElement: this.#value(value) });
+                continue;
+            }
+
+            if (data.$increment?.includes(key)) {
+                updateTransforms = updateTransforms ?? [];
                 updateTransforms.push({ fieldPath: key, increment: this.#value(value) });
                 continue;
             }
 
-            if (value !== undefined) fields[ key ] = this.#value(value);
-
             fieldPaths.push(key);
+            fields[ key ] = this.#value(value);
         }
 
-        const id = options.id ?? crypto.randomUUID();
-        const path = `projects/${this.#project}/databases/(default)/documents/${collection}/${id}`;
-
-        // might need to check results for errors
-        await this.#fetch('POST', ':batchWrite', {
+        const id = data.$id ?? crypto.randomUUID();
+        const name = `projects/${this.#project}/databases/(default)/documents/${collection}/${id}`;
+        const body = {
             writes: [ {
                 updateTransforms,
+                update: { fields, name },
                 updateMask: { fieldPaths },
-                update: { fields, name: path },
             } ]
-        });
+        };
 
+        await this.#fetch('POST', `:commit`, body);
     }
 
-    async create<C extends string, D extends Data, O extends Options> (collection: C, data: D, options: O = <O>{}): Promise<ResultRecord> {
+    async create<C extends string, D extends Data> (collection: C, data: D): Promise<ResultRecord> {
+        data = { ...data };
 
-        if (options.rule !== false) {
-            this.#rule.get(`create.${collection}.*`)?.(data, options);
-            this.#rule.get(`create.*.*`)?.(data, options);
-            this.#rule.get(`*.*.*`)?.(data, options);
+        if (data.$rule !== false) {
+            this.#rule.get(`create.${collection}.*`)?.(data);
+            this.#rule.get(`create.*.*`)?.(data);
+            this.#rule.get(`*.*.*`)?.(data);
         }
 
-        const filters = [];
         const fields: Record<string, Value> = {};
         for (const key in data) {
 
-            if (options.rule !== false) {
-                this.#rule.get(`create.${collection}.${key}`)?.(data, options);
-                this.#rule.get(`create.*.${key}`)?.(data, options);
-                this.#rule.get(`*.*.${key}`)?.(data, options);
+            if (data.$rule !== false) {
+                this.#rule.get(`create.${collection}.${key}`)?.(data);
+                this.#rule.get(`create.*.${key}`)?.(data);
+                this.#rule.get(`*.*.${key}`)?.(data);
             }
 
             const value = data[ key ];
-            if (value === undefined) continue;
+            if (value === undefined) throw new Error(`Create - property ${key} undefined`);
             fields[ key ] = this.#value(value);
-
-            const operator = options.where?.[ key ];
-            if (!operator) continue;
-            if (typeof operator !== 'string') throw new Error(`Create - operator ${key} invalid`);
-            filters.push(this.#filter(operator, key, value));
         }
 
-        if (options.id && options.where) throw new Error('Create - property $id and $where found');
-        if (!options.id && !options.where) throw new Error('Create - property $id or $where not found');
-
-        if (options.id) {
-            const post = await this.#fetch('POST', `/${collection}/?documentId=${options.id}`, { fields });
+        if (data.$id) {
+            const post = await this.#fetch('POST', `/${collection}/?documentId=${data.$id}`, { fields });
             return post.fields ? this.#parse(post.fields) : null;
         }
 
-        const { name } = await this.#where('Create', collection, options, filters);
+        const { name } = await this.#query(collection, data);
 
         if (name) throw new Error('Create - document found'); // maybe null insted
 
@@ -344,42 +302,33 @@ export default class Database {
         return this.#parse(post.fields);
     }
 
-    async remove<C extends string, D extends Data, O extends Options> (collection: C, data: D, options: O = <O>{}): Promise<ResultRecord | null> {
+    async remove<C extends string, D extends Data> (collection: C, data: D): Promise<ResultRecord | null> {
+        data = { ...data };
 
-        if (options.rule !== false) {
-            this.#rule.get(`remove.${collection}.*`)?.(data, options);
-            this.#rule.get(`remove.*.*`)?.(data, options);
-            this.#rule.get(`*.*.*`)?.(data, options);
+        if (data.$rule !== false) {
+            this.#rule.get(`remove.${collection}.*`)?.(data);
+            this.#rule.get(`remove.*.*`)?.(data);
+            this.#rule.get(`*.*.*`)?.(data);
         }
 
-        const filters = [];
         for (const key in data) {
 
-            if (options.rule !== false) {
-                this.#rule.get(`remove.${collection}.${key}`)?.(data, options);
-                this.#rule.get(`remove.*.${key}`)?.(data, options);
-                this.#rule.get(`*.*.${key}`)?.(data, options);
+            if (data.$rule !== false) {
+                this.#rule.get(`remove.${collection}.${key}`)?.(data);
+                this.#rule.get(`remove.*.${key}`)?.(data);
+                this.#rule.get(`*.*.${key}`)?.(data);
             }
 
             const value = data[ key ];
             if (value === undefined) throw new Error(`Remove - property ${key} undefined`);
-
-            const operator = options.where?.[ key ];
-            if (!operator) continue;
-            if (typeof operator !== 'string') throw new Error(`Remove - operator ${key} invalid`);
-            filters.push(this.#filter(operator, key, value));
         }
 
-        if (options.id && options.where) throw new Error('Remove - invalid format $id or $where');
-        if (!options.id && !options.where) throw new Error('Remove - invalid format $id or $where');
-
-        if (options.id) {
-            await this.#fetch('DELETE', `/${collection}/${options.id}`);
+        if (data.$id) {
+            await this.#fetch('DELETE', `/${collection}/${data.$id}`);
             return null;
         }
 
-        const { name, result } = await this.#where('Remove', collection, options, filters);
-
+        const { name, result } = await this.#query(collection, data);
         if (!name) return null;
 
         const id = name.split('/').slice(-1)[ 0 ];
@@ -388,65 +337,56 @@ export default class Database {
         return this.#parse(result);
     }
 
-    async view<C extends string, D extends Data, O extends Options> (collection: C, data: D, options: O = <O>{}): Promise<ResultRecord | null> {
+    async view<C extends string, D extends Data> (collection: C, data: D): Promise<ResultRecord | null> {
+        data = { ...data };
 
-        if (options.rule !== false) {
-            this.#rule.get(`view.${collection}.*`)?.(data, options);
-            this.#rule.get(`view.*.*`)?.(data, options);
-            this.#rule.get(`*.*.*`)?.(data, options);
+        if (data.$rule !== false) {
+            this.#rule.get(`view.${collection}.*`)?.(data);
+            this.#rule.get(`view.*.*`)?.(data);
+            this.#rule.get(`*.*.*`)?.(data);
         }
 
-        const filters = [];
         for (const key in data) {
 
-            if (options.rule !== false) {
-                this.#rule.get(`view.${collection}.${key}`)?.(data, options);
-                this.#rule.get(`view.*.${key}`)?.(data, options);
-                this.#rule.get(`*.*.${key}`)?.(data, options);
+            if (data.$rule !== false) {
+                this.#rule.get(`view.${collection}.${key}`)?.(data);
+                this.#rule.get(`view.*.${key}`)?.(data);
+                this.#rule.get(`*.*.${key}`)?.(data);
             }
 
             const value = data[ key ];
             if (value === undefined) throw new Error(`View - property ${key} undefined`);
-
-            const operator = options.where?.[ key ];
-            if (!operator) continue;
-            if (typeof operator !== 'string') throw new Error(`View - operator ${key} invalid`);
-            filters.push(this.#filter(operator, key, value));
         }
 
-        if (options.id && options.where) throw new Error('View - invalid format $id or $where');
-        if (!options.id && !options.where) throw new Error('View - invalid format $id or $where');
-
-        if (options.id) {
-            const get = await this.#fetch('GET', `/${collection}/${options.id}`);
-            return get.fields ? this.#parse(get.fields) : null;
+        if (data.$id) {
+            const get = await this.#fetch('GET', `/${collection}/${data.$id}`);
+            return get?.fields ? this.#parse(get?.fields) : null;
         }
 
-        const { name, result } = await this.#where('View', collection, options, filters);
-
+        const { name, result } = await this.#query(collection, data);
         if (!name) return null;
 
         return this.#parse(result);
     }
 
-    async update<C extends string, D extends Data, O extends Options> (collection: C, data: D, options: O = <O>{}): Promise<ResultRecord | null> {
+    async update<C extends string, D extends Data> (collection: C, data: D): Promise<ResultRecord | null> {
+        data = { ...data };
 
-        if (options.rule !== false) {
-            this.#rule.get(`update.${collection}.*`)?.(data, options);
-            this.#rule.get(`update.*.*`)?.(data, options);
-            this.#rule.get(`*.*.*`)?.(data, options);
+        if (data.$rule !== false) {
+            this.#rule.get(`update.${collection}.*`)?.(data);
+            this.#rule.get(`update.*.*`)?.(data);
+            this.#rule.get(`*.*.*`)?.(data);
         }
 
-        const filters = [];
         const fields: Record<string, Value> = {};
         let mask = '?currentDocument.exists=true';
 
         for (const key in data) {
 
-            if (options.rule !== false) {
-                this.#rule.get(`update.${collection}.${key}`)?.(data, options);
-                this.#rule.get(`update.*.${key}`)?.(data, options);
-                this.#rule.get(`*.*.${key}`)?.(data, options);
+            if (data.$rule !== false) {
+                this.#rule.get(`update.${collection}.${key}`)?.(data);
+                this.#rule.get(`update.*.${key}`)?.(data);
+                this.#rule.get(`*.*.${key}`)?.(data);
             }
 
             mask += `&updateMask.fieldPaths=${key}`;
@@ -455,24 +395,14 @@ export default class Database {
             if (value === undefined) continue;
 
             fields[ key ] = this.#value(value);
-
-            const operator = options.where?.[ key ];
-            if (!operator) continue;
-            if (typeof operator !== 'string') throw new Error(`Update - operator ${key} invalid`);
-            filters.push(this.#filter(operator, key, value));
-
         }
 
-        if (options.id && options.where) throw new Error('Update - invalid format $id or $where');
-        if (!options.id && !options.where) throw new Error('Update - invalid format $id or $where');
-
-        if (options.id) {
-            const patch = await this.#fetch('PATCH', `/${collection}/${options.id}${mask}`, { fields });
+        if (data.$id) {
+            const patch = await this.#fetch('PATCH', `/${collection}/${data.$id}${mask}`, { fields });
             return patch.fields ? this.#parse(patch.fields) : null;
         }
 
-        const { name } = await this.#where('Update', collection, options, filters);
-
+        const { name } = await this.#query(collection, data);
         if (!name) return null;
 
         const id = name.split('/').slice(-1)[ 0 ];
@@ -483,73 +413,78 @@ export default class Database {
         return this.#parse(patch.fields);
     }
 
-    async search<C extends string, D extends Data, O extends Options> (collection: C, data: D, options: O = <O>{}): Promise<ResultArray> {
+    async search<C extends string, D extends Data> (collection: C, data: D): Promise<ResultArray> {
+        data = { ...data };
 
-        if (options.rule !== false) {
-            this.#rule.get(`search.${collection}.*`)?.(data, options);
-            this.#rule.get(`search.*.*`)?.(data, options);
-            this.#rule.get(`*.*.*`)?.(data, options);
-        }
-
-        let orderBy: OrderBy | undefined;
-        let startAt: StartAt | undefined;
-        let endAt: EndAt | undefined;
-
-        const token = options.token;
-        for (const name in token) {
-            const value = token[ name ];
-            const direction = options.order?.[ name ] ?? 'ASCENDING';
-            orderBy = orderBy ?? [];
-            startAt = startAt ?? { values: [] };
-            orderBy.push(this.#order(name, direction));
-            startAt.values.push(this.#value(value));
+        if (data.$rule !== false) {
+            this.#rule.get(`search.${collection}.*`)?.(data);
+            this.#rule.get(`search.*.*`)?.(data);
+            this.#rule.get(`*.*.*`)?.(data);
         }
 
         const filters: Filters = [];
         for (const key in data) {
 
-            if (options.rule !== false) {
-                this.#rule.get(`search.${collection}.${key}`)?.(data, options);
-                this.#rule.get(`search.*.${key}`)?.(data, options);
-                this.#rule.get(`*.*.${key}`)?.(data, options);
+            if (data.$rule !== false) {
+                this.#rule.get(`search.${collection}.${key}`)?.(data);
+                this.#rule.get(`search.*.${key}`)?.(data);
+                this.#rule.get(`*.*.${key}`)?.(data);
             }
+
+            if (key.startsWith('$')) continue;
 
             const value = data[ key ];
             if (value === undefined) throw new Error(`Search - property ${key} undefined`);
-
-            const operator = options.where?.[ key ];
-            if (!operator) continue;
-            if (typeof operator !== 'string') throw new Error(`Search - operator ${key} invalid`);
-
-            if (/^(s|starts_?with)$/i.test(operator)) {
-                const start = value;
-                const length = start.length;
-                const startPart = start.slice(0, length - 1);
-                const endPart = start.slice(length - 1, length);
-                const end = startPart + String.fromCharCode(endPart.charCodeAt(0) + 1);
-                const direction = options.order?.[ key ] ?? 'ASCENDING';
-                orderBy = orderBy ?? [];
-                orderBy.push(this.#order(key, direction));
-                filters.push(this.#filter('GREATER_THAN_OR_EQUAL', key, start));
-                filters.push(this.#filter('LESS_THAN', key, end));
-                continue;
-            }
-
-            filters.push(this.#filter(operator, key, value));
         }
 
-        const wheres = Object.keys(options.where ?? {});
-        if (!wheres.length) throw new Error('Search - operators required');
-        if (filters.length !== wheres.length) throw new Error(`Search - properties required ${wheres.join(', ')}`);
+        let orderBy: OrderBy | undefined = [];
+        let startAt: StartAt | undefined = { values: [] };
+        let endAt: EndAt | undefined = { values: [] };
 
-        const limit: number | undefined = options.limit;
-        const offset: number | undefined = options.offset;
+        data.$ascending?.forEach(key => orderBy?.push(this.#order(key, 'ASCENDING')));
+        data.$descending?.forEach(key => orderBy?.push(this.#order(key, 'DESCENDING')));
+
+        data.$start?.forEach(cursor => startAt?.values?.push(this.#value(cursor)));
+        data.$end?.forEach(cursor => endAt?.values?.push(this.#value(cursor)));
+
+        data.$startsWith?.forEach(key => {
+            const start = data[ key ];
+            const length = start.length;
+            const startPart = start.slice(0, length - 1);
+            const endPart = start.slice(length - 1, length);
+            const end = startPart + String.fromCharCode(endPart.charCodeAt(0) + 1);
+            filters.push(this.#filter('GREATER_THAN_OR_EQUAL', key, start));
+            filters.push(this.#filter('LESS_THAN', key, end));
+        });
+
+        data.$in?.forEach(key => filters.push(this.#filter('IN', key, data[ key ])));
+        data.$notIn?.forEach(key => filters.push(this.#filter('NOT_IN', key, data[ key ])));
+        data.$equal?.forEach(key => filters.push(this.#filter('EQUAL', key, data[ key ])));
+        data.$notEqual?.forEach(key => filters.push(this.#filter('NOT_EQUAL', key, data[ key ])));
+        data.$lessThan?.forEach(key => filters.push(this.#filter('LESS_THAN', key, data[ key ])));
+        data.$lessThanOrEqual?.forEach(key => filters.push(this.#filter('LESS_THAN_OR_EQUAL', key, data[ key ])));
+        data.$arrayContains?.forEach(key => filters.push(this.#filter('ARRAY_CONTAINS', key, data[ key ])));
+        data.$arrayContainsAny?.forEach(key => filters.push(this.#filter('ARRAY_CONTAINS_ANY', key, data[ key ])));
+        data.$greaterThan?.forEach(key => filters.push(this.#filter('GREATER_THAN', key, data[ key ])));
+        data.$greaterThanOrEqual?.forEach(key => filters.push(this.#filter('GREATER_THAN_OR_EQUAL', key, data[ key ])));
+
+        if (!filters.length) throw new Error('Search - requires filters');
+
+        orderBy = orderBy?.length ? orderBy : undefined;
+        endAt = endAt?.values?.length ? endAt : undefined;
+        startAt = startAt?.values?.length ? startAt : undefined;
+
+        const limit: number | undefined = data.$limit;
+        const offset: number | undefined = data.$offset;
         const from: From = [ { collectionId: collection } ];
         const where: Where = { compositeFilter: { op: 'AND', filters } };
         const body = { structuredQuery: { from, where, limit, offset, orderBy, startAt, endAt } };
         const query = await this.#fetch('POST', ':runQuery', body);
 
-        return query?.map((entity: any) => this.#parse(entity.document.fields)) ?? [];
+        if (query[ 0 ]?.error) throw new Error(JSON.stringify(query[ 0 ]?.error, null, '\t'));
+        if (!query[ 0 ]?.document?.fields) return [];
+
+        return query.map((entity: any) => this.#parse(entity.document.fields));
     }
 
 }
