@@ -6,9 +6,9 @@ import {
     Value,
     Data,
     Direction,
-    Rule, Method, Action,
+    On, Method, Action,
     ResultArray, ResultRecord,
-    EndAt, OrderBy, StartAt, Where, FieldFilter, Filters, Order, Options, Operator,
+    EndAt, OrderBy, StartAt, Where, FieldFilter, Filters, Order, Options, Operator, FieldTransform, ArrayValue,
 } from './types.ts';
 
 export default class Database {
@@ -17,7 +17,7 @@ export default class Database {
     #token?: string;
     #expires?: number;
     #project?: string;
-    #rule: Map<string, Rule> = new Map();
+    #on: Map<string, On> = new Map();
 
     #properties = [
         'integerValue', 'doubleValue',
@@ -65,7 +65,8 @@ export default class Database {
     }
 
     #parse (value: any): any {
-        const property = Object.keys(value).find(key => this.#properties.includes(key));
+        const keys = Object.keys(value);
+        const property = keys.find(key => this.#properties.includes(key));
 
         if (property === 'nullValue') {
             value = null;
@@ -90,15 +91,35 @@ export default class Database {
         } else if (property === 'referenceValue' || property === 'byteValue') {
             throw new Error(`${property} not implenmeted yet`);
         } else if (typeof value === 'object') {
-            console.log(value);
-            Object.keys(value).forEach(key => value[ key ] = this.#parse(value[ key ]));
+            keys.forEach(key => value[ key ] = this.#parse(value[ key ]));
         }
 
         return value;
     }
 
+    #valid (data: Data): boolean {
+        return '$id' in data && (
+            '$startsWith' in data ||
+            '$in' in data ||
+            '$notIn' in data ||
+            '$equal' in data ||
+            '$notEqual' in data ||
+            '$lessThan' in data ||
+            '$arrayContains' in data ||
+            '$lessThanOrEqual' in data ||
+            '$arrayContainsAny' in data ||
+            '$greaterThan' in data ||
+            '$greaterThanOrEqual' in data ||
+            '$start' in data ||
+            '$end' in data ||
+            '$limit' in data ||
+            '$offset' in data ||
+            '$descending' in data ||
+            '$ascending' in data) ? false : true;
+    }
+
     async #query (collection: string, data: Data) {
-        const filters: Filters = [];
+        const filters: Array<FieldFilter> = [];
 
         data.$startsWith?.forEach(key => {
             const start = data[ key ];
@@ -120,6 +141,20 @@ export default class Database {
         data.$arrayContainsAny?.forEach(key => filters.push(this.#filter('ARRAY_CONTAINS_ANY', key, data[ key ])));
         data.$greaterThan?.forEach(key => filters.push(this.#filter('GREATER_THAN', key, data[ key ])));
         data.$greaterThanOrEqual?.forEach(key => filters.push(this.#filter('GREATER_THAN_OR_EQUAL', key, data[ key ])));
+
+        const keys = [
+            ...data.$startsWith ?? [],
+            ...data.$in ?? [],
+            ...data.$notIn ?? [],
+            ...data.$equal ?? [],
+            ...data.$notEqual ?? [],
+            ...data.$lessThan ?? [],
+            ...data.$lessThanOrEqual ?? [],
+            ...data.$arrayContains ?? [],
+            ...data.$arrayContainsAny ?? [],
+            ...data.$greaterThan ?? [],
+            ...data.$greaterThanOrEqual ?? []
+        ];
 
         if (!filters.length) throw new Error('Query - requires filters');
 
@@ -187,7 +222,6 @@ export default class Database {
 
         const result = await response.json();
 
-        // if (method === 'DELETE' && response.status === 200) return;
         if (method === 'GET' && result?.error?.code === 404) return null;
 
         if (result.error) {
@@ -207,38 +241,41 @@ export default class Database {
         return this;
     }
 
-    rule (action: Action, collection: '*' | string, name: '*' | string, method: Rule): this {
-        this.#rule.set(`${action}.${collection}.${name}`, method);
+    on (action: Action, collection: '*' | string, key: '*' | string, method: On): this {
+        this.#on.set(`${action}.${collection}.${key}`, method);
         return this;
     }
 
-    async set<C extends string, D extends Data> (collection: C, data: D): Promise<void> {
+    async set (collection: string, data: Data): Promise<void> {
         data = { ...data };
 
-        if (data.$rule !== false) {
-            this.#rule.get(`set.${collection}.*`)?.(data);
-            this.#rule.get(`set.*.*`)?.(data);
-            this.#rule.get(`*.*.*`)?.(data);
+        if (data.$on !== false) {
+            this.#on.get(`set.${collection}.*`)?.(data);
+            this.#on.get(`set.*.*`)?.(data);
+            this.#on.get(`*.*.*`)?.(data);
         }
 
         const fieldPaths: Array<string> = [];
         const fields: Record<string, Value> = {};
-        let updateTransforms: Array<Record<string, string | Value>> | undefined;
+        let updateTransforms: Array<FieldTransform> | undefined;
 
         for (const key in data) {
 
-            if (data.$rule !== false) {
-                this.#rule.get(`set.${collection}.${key}`)?.(data);
-                this.#rule.get(`set.*.${key}`)?.(data);
-                this.#rule.get(`*.*.${key}`)?.(data);
+            if (data.$on !== false) {
+                this.#on.get(`set.${collection}.${key}`)?.(data);
+                this.#on.get(`set.*.${key}`)?.(data);
+                this.#on.get(`*.*.${key}`)?.(data);
             }
+
+            if (key.startsWith('$')) continue;
 
             const value = data[ key ];
             if (value === undefined) throw new Error(`Set - property ${key} undefined`);
 
             if (data.$append?.includes(key)) {
                 updateTransforms = updateTransforms ?? [];
-                updateTransforms.push({ fieldPath: key, appendMissingElement: this.#value(value) });
+                const appendMissingElements = (this.#value(value) as { arrayValue: ArrayValue; })?.arrayValue;
+                updateTransforms.push({ fieldPath: key, appendMissingElements });
                 continue;
             }
 
@@ -252,8 +289,10 @@ export default class Database {
             fields[ key ] = this.#value(value);
         }
 
-        const id = data.$id ?? crypto.randomUUID();
-        const name = `projects/${this.#project}/databases/(default)/documents/${collection}/${id}`;
+        // if (!data.$id) throw new Error('Set - $id required');
+
+        const id = data.$id ? `/${data.$id}` : '';
+        const name = `projects/${this.#project}/databases/(default)/documents/${collection}${id}`;
         const body = {
             writes: [ {
                 updateTransforms,
@@ -265,28 +304,33 @@ export default class Database {
         await this.#fetch('POST', `:commit`, body);
     }
 
-    async create<C extends string, D extends Data> (collection: C, data: D): Promise<ResultRecord> {
+    async create (collection: string, data: Data): Promise<ResultRecord> {
         data = { ...data };
 
-        if (data.$rule !== false) {
-            this.#rule.get(`create.${collection}.*`)?.(data);
-            this.#rule.get(`create.*.*`)?.(data);
-            this.#rule.get(`*.*.*`)?.(data);
+        if (data.$on !== false) {
+            this.#on.get(`create.${collection}.*`)?.(data);
+            this.#on.get(`create.*.*`)?.(data);
+            this.#on.get(`*.*.*`)?.(data);
         }
 
         const fields: Record<string, Value> = {};
         for (const key in data) {
 
-            if (data.$rule !== false) {
-                this.#rule.get(`create.${collection}.${key}`)?.(data);
-                this.#rule.get(`create.*.${key}`)?.(data);
-                this.#rule.get(`*.*.${key}`)?.(data);
+            if (data.$on !== false) {
+                this.#on.get(`create.${collection}.${key}`)?.(data);
+                this.#on.get(`create.*.${key}`)?.(data);
+                this.#on.get(`*.*.${key}`)?.(data);
             }
+
+            if (key.startsWith('$')) continue;
 
             const value = data[ key ];
             if (value === undefined) throw new Error(`Create - property ${key} undefined`);
+
             fields[ key ] = this.#value(value);
         }
+
+        if (!this.#valid(data)) throw new Error('Create - data format not valid');
 
         if (data.$id) {
             const post = await this.#fetch('POST', `/${collection}/?documentId=${data.$id}`, { fields });
@@ -302,26 +346,30 @@ export default class Database {
         return this.#parse(post.fields);
     }
 
-    async remove<C extends string, D extends Data> (collection: C, data: D): Promise<ResultRecord | null> {
+    async remove (collection: string, data: Data): Promise<ResultRecord | null> {
         data = { ...data };
 
-        if (data.$rule !== false) {
-            this.#rule.get(`remove.${collection}.*`)?.(data);
-            this.#rule.get(`remove.*.*`)?.(data);
-            this.#rule.get(`*.*.*`)?.(data);
+        if (data.$on !== false) {
+            this.#on.get(`remove.${collection}.*`)?.(data);
+            this.#on.get(`remove.*.*`)?.(data);
+            this.#on.get(`*.*.*`)?.(data);
         }
 
         for (const key in data) {
 
-            if (data.$rule !== false) {
-                this.#rule.get(`remove.${collection}.${key}`)?.(data);
-                this.#rule.get(`remove.*.${key}`)?.(data);
-                this.#rule.get(`*.*.${key}`)?.(data);
+            if (data.$on !== false) {
+                this.#on.get(`remove.${collection}.${key}`)?.(data);
+                this.#on.get(`remove.*.${key}`)?.(data);
+                this.#on.get(`*.*.${key}`)?.(data);
             }
+
+            if (key.startsWith('$')) continue;
 
             const value = data[ key ];
             if (value === undefined) throw new Error(`Remove - property ${key} undefined`);
         }
+
+        if (!this.#valid(data)) throw new Error('Remove - data format not valid');
 
         if (data.$id) {
             await this.#fetch('DELETE', `/${collection}/${data.$id}`);
@@ -337,26 +385,30 @@ export default class Database {
         return this.#parse(result);
     }
 
-    async view<C extends string, D extends Data> (collection: C, data: D): Promise<ResultRecord | null> {
+    async view (collection: string, data: Data): Promise<ResultRecord | null> {
         data = { ...data };
 
-        if (data.$rule !== false) {
-            this.#rule.get(`view.${collection}.*`)?.(data);
-            this.#rule.get(`view.*.*`)?.(data);
-            this.#rule.get(`*.*.*`)?.(data);
+        if (data.$on !== false) {
+            this.#on.get(`view.${collection}.*`)?.(data);
+            this.#on.get(`view.*.*`)?.(data);
+            this.#on.get(`*.*.*`)?.(data);
         }
 
         for (const key in data) {
 
-            if (data.$rule !== false) {
-                this.#rule.get(`view.${collection}.${key}`)?.(data);
-                this.#rule.get(`view.*.${key}`)?.(data);
-                this.#rule.get(`*.*.${key}`)?.(data);
+            if (data.$on !== false) {
+                this.#on.get(`view.${collection}.${key}`)?.(data);
+                this.#on.get(`view.*.${key}`)?.(data);
+                this.#on.get(`*.*.${key}`)?.(data);
             }
+
+            if (key.startsWith('$')) continue;
 
             const value = data[ key ];
             if (value === undefined) throw new Error(`View - property ${key} undefined`);
         }
+
+        if (!this.#valid(data)) throw new Error('View - data format not valid');
 
         if (data.$id) {
             const get = await this.#fetch('GET', `/${collection}/${data.$id}`);
@@ -369,13 +421,13 @@ export default class Database {
         return this.#parse(result);
     }
 
-    async update<C extends string, D extends Data> (collection: C, data: D): Promise<ResultRecord | null> {
+    async update (collection: string, data: Data): Promise<ResultRecord | null> {
         data = { ...data };
 
-        if (data.$rule !== false) {
-            this.#rule.get(`update.${collection}.*`)?.(data);
-            this.#rule.get(`update.*.*`)?.(data);
-            this.#rule.get(`*.*.*`)?.(data);
+        if (data.$on !== false) {
+            this.#on.get(`update.${collection}.*`)?.(data);
+            this.#on.get(`update.*.*`)?.(data);
+            this.#on.get(`*.*.*`)?.(data);
         }
 
         const fields: Record<string, Value> = {};
@@ -383,11 +435,13 @@ export default class Database {
 
         for (const key in data) {
 
-            if (data.$rule !== false) {
-                this.#rule.get(`update.${collection}.${key}`)?.(data);
-                this.#rule.get(`update.*.${key}`)?.(data);
-                this.#rule.get(`*.*.${key}`)?.(data);
+            if (data.$on !== false) {
+                this.#on.get(`update.${collection}.${key}`)?.(data);
+                this.#on.get(`update.*.${key}`)?.(data);
+                this.#on.get(`*.*.${key}`)?.(data);
             }
+
+            if (key.startsWith('$')) continue;
 
             mask += `&updateMask.fieldPaths=${key}`;
 
@@ -396,6 +450,8 @@ export default class Database {
 
             fields[ key ] = this.#value(value);
         }
+
+        if (!this.#valid(data)) throw new Error('Update - data format not valid');
 
         if (data.$id) {
             const patch = await this.#fetch('PATCH', `/${collection}/${data.$id}${mask}`, { fields });
@@ -413,22 +469,22 @@ export default class Database {
         return this.#parse(patch.fields);
     }
 
-    async search<C extends string, D extends Data> (collection: C, data: D): Promise<ResultArray> {
+    async search (collection: string, data: Data): Promise<ResultArray> {
         data = { ...data };
 
-        if (data.$rule !== false) {
-            this.#rule.get(`search.${collection}.*`)?.(data);
-            this.#rule.get(`search.*.*`)?.(data);
-            this.#rule.get(`*.*.*`)?.(data);
+        if (data.$on !== false) {
+            this.#on.get(`search.${collection}.*`)?.(data);
+            this.#on.get(`search.*.*`)?.(data);
+            this.#on.get(`*.*.*`)?.(data);
         }
 
         const filters: Filters = [];
         for (const key in data) {
 
-            if (data.$rule !== false) {
-                this.#rule.get(`search.${collection}.${key}`)?.(data);
-                this.#rule.get(`search.*.${key}`)?.(data);
-                this.#rule.get(`*.*.${key}`)?.(data);
+            if (data.$on !== false) {
+                this.#on.get(`search.${collection}.${key}`)?.(data);
+                this.#on.get(`search.*.${key}`)?.(data);
+                this.#on.get(`*.*.${key}`)?.(data);
             }
 
             if (key.startsWith('$')) continue;
@@ -436,6 +492,8 @@ export default class Database {
             const value = data[ key ];
             if (value === undefined) throw new Error(`Search - property ${key} undefined`);
         }
+
+        if ('$id' in data) throw new Error('Search - $id property not a valid option');
 
         let orderBy: OrderBy | undefined = [];
         let startAt: StartAt | undefined = { values: [] };

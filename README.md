@@ -37,84 +37,133 @@ console.log(user);
 
 ## API
 
+### `type Data`
+This is all the options for the data parameter. The `$` character marks a reserved property and will not be added to the database.
+```ts
+type Data = {
+
+    // All: override on event
+    $on?: boolean;
+
+    // All Except Search:
+    $id?: string;
+
+    // Set: property name/s to increment
+    // https://firebase.google.com/docs/firestore/reference/rest/v1/Write#FieldTransform.FIELDS.increment
+    $increment?: Array<string>;
+
+    // Set: property name/s to append missing elements
+    // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/Write#FieldTransform.FIELDS.append_missing_elements
+    $append?: Array<string>;
+
+    // Custom Filters - START
+    $startsWith?: Array<string>;
+    // Custom Filters - END
+
+
+    // Standard Filters - START
+
+    // All Except Set:
+    $in?: Array<string>;
+
+    // All Except Set:
+    $notIn?: Array<string>;
+
+    // All Except Set:
+    $equal?: Array<string>;
+
+    // All Except Set:
+    $notEqual?: Array<string>;
+
+    // All Except Set:
+    $lessThan?: Array<string>;
+
+    // All Except Set:
+    $lessThanOrEqual?: Array<string>;
+
+    // All Except Set:
+    $arrayContains?: Array<string>;
+
+    // All Except Set:
+    $arrayContainsAny?: Array<string>;
+
+    // All Except Set:
+    $greaterThan?: Array<string>;
+
+    // All Except Set:
+    $greaterThanOrEqual?: Array<string>;
+
+    // Standard Filters - End
+
+
+    // Search: orders results by property name/s
+    $ascending?: Array<string>; // All except Set:
+    $descending?: Array<string>; // All except Set:
+
+    // Search:
+    // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.start_at
+    $start?: Array<Record<string, Data>>;
+
+    // Search:
+    // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.end_at
+    $end?: Array<Record<string, Data>>;
+
+    // Search: The maximum number of results to return.
+    // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.limit
+    $limit?: number;
+
+    // Search: The number of results to skip.
+    // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.offset
+    $offset?: number;
+
+    [ key: string ]: any;
+};
+```
+
 ### `project(project: string): this`
 Firestore project name.
 
 ### `key(key: string): this`
 Firestore service key.
 
-### `rule (action: Action, collection: '*' | string, name: '*' | string, method: Rule): this`
+### `on (action: Action, collection: '*' | string, name: '*' | string, method: On): this`
 ```ts
-database.rule('create', '*', '*', data => {
+database.on('create', '*', '*', data => {
     if (!data.account || typeof data.account !== 'string') throw new Error('account string required');
     if (!data.created || typeof data.created !== 'number') throw new Error('created number required');
     data.id = `${data.account}.${data.id ?? crypto.randomUUID()}`;
 });
 ```
 
-### `view(collection: string, data: Record<string, any>)`
+### `view(collection: string, data: Data)`
 ```ts
 const user = await database.view('user', { id: '1' });
 ```
 
-### `remove(collection: string, data: Record<string, any>)`
+### `remove(collection: string, data: Data)`
 ```ts
 const user = await database.remove('user', { id: '1' });
 ```
 
-### `create(collection: string, data: Record<string, any>)`
+### `create(collection: string, data: Data)`
 ```ts
 const user = await database.create('user', { id: '1', name: 'foo bar' });
 ```
 
-### `update(collection: string, data: Record<string, any>)`
+### `update(collection: string, data: Data)`
 ```ts
 const user = await database.update('user', { id: '1', age: 69 });
 ```
 
-### `set(collection: string, data: Record<string, any>)`
-
-### `search(collection: string, data: Record<string, any>)`
+### `search(collection: string, data: Data)`
 ```ts
-const users = await database.search('user', {
-    age: 69,
-
-    /*
-    $rule?: boolean; // disable rule
-    $token?: Record<string, any>; // record to start the search pagination
-    $operator?: Operator | Record<string, Operator>; // define operators
-    $direction?: Direction | Record<string, Direction>; // order records
-
-    $where?: any; // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.where
-    $endAt?: any; // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.end_at
-    $limit?: number; // Firestore: The maximum number of results to return. https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.limit
-    $offset?: number; // Firestore: The number of results to skip. https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.offset
-
-    $from?: From; // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.from
-    $startAt?: StartAt; // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.start_at
-    $orderBy?: OrderBy; // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.order_by
-    */
-
-});
+const users = await database.search('user', { age: 69 });
 ```
 
-<!-- ### `constant()`
-- View: NA
-- Remove: NA
-- Create: Requires `constant` properties.
-- Update: Will not update `constant` properties.
-- Set: NA
-- Search: NA
-
-### `scope()`
-Creates a composite `Firestore id` using the `id` and `scope` properties. Property values must be a string type.
-
-- View: Requires `id` and `scope` properties.
-- Remove: Requires `id` and `scope` properties.
-- Create: Requires `scope` properties.
-- Update: Requires `id` and `scope` properties. Will not update `id` or `scope` properties. Throws and error if item does not exist.
-- Set: Requires `scope` properties. Will create a new item or update an existing item depending on composite `Firestore id`.
-- Search: Requires `scope`. -->
+### `set(collection: string, data: Data)`
+```ts
+const user = await database.set('user', { id: '1', age: 1, $equal: [ 'id' ], $increment: [ 'age' ] });
+```
 
 <!--
 Firestore reset api docs

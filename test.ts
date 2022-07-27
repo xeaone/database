@@ -21,23 +21,23 @@ const database = new Database();
 database.key(key);
 database.project(project);
 
-// database.rule('create', '*', '*', (data, options) => {
+// database.on('create', '*', '*', (data, options) => {
 //     options.where = { id: 'e', account: 'e' };
 // });
 
-// database.rule('remove', '*', '*', (data, options) => {
+// database.on('remove', '*', '*', (data, options) => {
 //     options.where = { id: 'e', account: 'e' };
 // });
 
-// database.rule('update', '*', '*', (data, options) => {
+// database.on('update', '*', '*', (data, options) => {
 //     options.where = { id: 'e', account: 'e' };
 // });
 
-// database.rule('view', '*', '*', (data, options) => {
+// database.on('view', '*', '*', (data, options) => {
 //     options.where = { id: 'e', account: 'e' };
 // });
 
-// database.rule('search', '*', '*', (data, options) => {
+// database.on('search', '*', '*', (data, options) => {
 //     options.where = { account: 'e' };
 // });
 
@@ -74,16 +74,16 @@ database.project(project);
 /*
     View
 */
-const viewIdUser = await database.view('users', { $id: '1000' }); // not exist
-console.log(viewIdUser);
-const viewWhereUser = await database.view('users', { account: '2', $equal: [ 'account' ] }); // should exists
-console.log(viewWhereUser);
+// const viewIdUser = await database.view('users', { $id: '1000' }); // not exist
+// console.log(viewIdUser);
+// const viewWhereUser = await database.view('users', { account: '2', $equal: [ 'account' ] }); // should exists
+// console.log(viewWhereUser);
 
 
 /*
     Remove non exist
 */
-// const removeIdUser = await database.remove('users', {}, { id: '1000' });
+// const removeIdUser = await database.remove('users', { $id: '1000' });
 // console.log(removeIdUser);
 
 
@@ -99,4 +99,5 @@ console.log(viewWhereUser);
 */
 // const result = await database.set('users', { set: 'bar', inc: 10 }, { id: 'a422c84f-3e76-4a60-bf14-fb8749a15b68', increment: [ 'inc' ] });
 // console.log(result);
-
+const result = await database.set('users', { set: 'bar', inc: 1, ar: [ 2 ], $id: '8803823c-8cb4-4198-8880-7565ef09cbdd', $increment: [ 'inc' ], $append: [ 'ar' ] });
+console.log(result);

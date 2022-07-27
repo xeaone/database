@@ -27,7 +27,7 @@ export type Operator =
 
 export type Direction = 'ASCENDING' | 'DESCENDING';
 
-export type ArrayValue = { values: Value[]; };
+export type ArrayValue = { values: Array<Value>; };
 export type LatLng = { latitude: number, longitude: number; };
 export type MapValue = { fields: { [ key: string ]: Value; }; };
 export type Value =
@@ -47,11 +47,20 @@ export type FieldFilter = { fieldFilter: { op: Operator; field: FieldReference, 
 export type Filters = FieldFilter[];
 export type Where = { compositeFilter: { op: 'AND'; filters: Filters; }; };
 
+export type FieldTransform = {
+    fieldPath: string;
+    increment?: Value;
+    maximum?: Value;
+    minimum?: Value;
+    appendMissingElements?: ArrayValue;
+    removeAllFromArray?: ArrayValue;
+};
+
 // export type ResultValue = string | number | boolean | null | ResultArray | ResultRecord;
 // export type ResultArray = Array<ResultValue>;
 // export type ResultRecord = Record<string, ResultValue>;
 
-export type Rule = (data: Data) => void;
+export type On = (data: Data) => void;
 export type Action = '*' | 'set' | 'view' | 'search' | 'create' | 'update' | 'remove';
 export type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 
@@ -60,11 +69,12 @@ export type ResultRecord = Record<string, Data>;
 
 export type Data = {
 
-    // All: disable rule
-    $rule?: boolean;
+    // All: override on event
+    $on?: boolean;
 
-    // All Except Search:
+    // All Except Search: Overrides filters
     $id?: string;
+
 
     // Set: property name/s to increment
     // https://firebase.google.com/docs/firestore/reference/rest/v1/Write#FieldTransform.FIELDS.increment
@@ -73,6 +83,7 @@ export type Data = {
     // Set: property name/s to append missing elements
     // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/Write#FieldTransform.FIELDS.append_missing_elements
     $append?: Array<string>;
+
 
     // Custom Filters - START
     $startsWith?: Array<string>;
