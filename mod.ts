@@ -142,19 +142,11 @@ export default class Database {
         data.$greaterThan?.forEach(key => filters.push(this.#filter('GREATER_THAN', key, data[ key ])));
         data.$greaterThanOrEqual?.forEach(key => filters.push(this.#filter('GREATER_THAN_OR_EQUAL', key, data[ key ])));
 
-        const keys = [
-            ...data.$startsWith ?? [],
-            ...data.$in ?? [],
-            ...data.$notIn ?? [],
-            ...data.$equal ?? [],
-            ...data.$notEqual ?? [],
-            ...data.$lessThan ?? [],
-            ...data.$lessThanOrEqual ?? [],
-            ...data.$arrayContains ?? [],
-            ...data.$arrayContainsAny ?? [],
-            ...data.$greaterThan ?? [],
-            ...data.$greaterThanOrEqual ?? []
-        ];
+        Object.keys(data).forEach(key =>
+            !filters.find(filter => filter.fieldFilter.field.fieldPath === key) ?
+                filters.push(this.#filter('EQUAL', key, data[ key ])) :
+                null
+        );
 
         if (!filters.length) throw new Error('Query - requires filters');
 
