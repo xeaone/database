@@ -99,5 +99,8 @@ database.project(project);
 */
 // const result = await database.set('users', { set: 'bar', inc: 10 }, { id: 'a422c84f-3e76-4a60-bf14-fb8749a15b68', increment: [ 'inc' ] });
 // console.log(result);
-const result = await database.set('users', { set: 'bar', inc: 1, ar: [ 2 ], $id: '8803823c-8cb4-4198-8880-7565ef09cbdd', $increment: [ 'inc' ], $append: [ 'ar' ] });
-console.log(result);
+
+await database.set('users', { set: 'bar', inc: 1, ar: [ 2 ], $id: '8803823c-8cb4-4198-8880-7565ef09cbdd', $increment: [ 'inc' ], $append: [ 'ar' ] });
+const view = await database.view('users', { $id: '8803823c-8cb4-4198-8880-7565ef09cbdd' });
+const update = await database.update('users', { $id: '8803823c-8cb4-4198-8880-7565ef09cbdd' });
+console.log(view, update);

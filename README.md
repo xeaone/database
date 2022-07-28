@@ -69,7 +69,7 @@ type Data = {
     // All Except Set:
     $notIn?: Array<string>;
 
-    // All Except Set:
+    // All Except Set: default
     $equal?: Array<string>;
 
     // All Except Set:

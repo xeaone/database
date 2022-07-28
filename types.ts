@@ -49,31 +49,28 @@ export type Where = { compositeFilter: { op: 'AND'; filters: Filters; }; };
 
 export type FieldTransform = {
     fieldPath: string;
-    increment?: Value;
     maximum?: Value;
     minimum?: Value;
-    appendMissingElements?: ArrayValue;
+    increment?: Value;
     removeAllFromArray?: ArrayValue;
+    appendMissingElements?: ArrayValue;
 };
 
-// export type ResultValue = string | number | boolean | null | ResultArray | ResultRecord;
-// export type ResultArray = Array<ResultValue>;
-// export type ResultRecord = Record<string, ResultValue>;
-
-export type On = (data: Data) => void;
+export type After = (data: Data, collection: string) => void;
+export type Before = (data: Data, collection: string) => void;
 export type Action = '*' | 'set' | 'view' | 'search' | 'create' | 'update' | 'remove';
 export type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 
-export type ResultArray = Array<Data>;
-export type ResultRecord = Record<string, Data>;
+export type Results = Array<any>;
+export type Result = Record<string, any>;
 
 export type Data = {
 
-    // All: override on event
-    $on?: boolean;
+    // All: override before event
+    $before?: boolean;
 
     // All Except Search: Overrides filters
-    $id?: string;
+    $identifier?: string;
 
 
     // Set: property name/s to increment
@@ -131,11 +128,11 @@ export type Data = {
 
     // Search:
     // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.start_at
-    $start?: Array<Record<string, Data>>;
+    $start?: Array<Record<string, any>>;
 
     // Search:
     // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.end_at
-    $end?: Array<Record<string, Data>>;
+    $end?: Array<Record<string, any>>;
 
     // Search: The maximum number of results to return.
     // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.limit

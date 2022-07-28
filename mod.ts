@@ -1,14 +1,9 @@
 import jwt from './jwt.ts';
 
 import {
-    Key,
-    From,
-    Value,
-    Data,
-    Direction,
-    On, Method, Action,
-    ResultArray, ResultRecord,
-    EndAt, OrderBy, StartAt, Where, FieldFilter, Filters, Order, Options, Operator, FieldTransform, ArrayValue,
+    Key, From, Data, Value, Direction,
+    Options, Results, Result, Before, Method, Action,
+    EndAt, OrderBy, StartAt, Where, FieldFilter, Filters, Order, Operator, FieldTransform, ArrayValue
 } from './types.ts';
 
 export default class Database {
@@ -17,7 +12,8 @@ export default class Database {
     #token?: string;
     #expires?: number;
     #project?: string;
-    #on: Map<string, On> = new Map();
+    #after: Map<string, Before> = new Map();
+    #before: Map<string, Before> = new Map();
 
     #properties = [
         'integerValue', 'doubleValue',
@@ -98,7 +94,7 @@ export default class Database {
     }
 
     #valid (data: Data): boolean {
-        return '$id' in data && (
+        return 'id' in data === false && (
             '$startsWith' in data ||
             '$in' in data ||
             '$notIn' in data ||
@@ -143,7 +139,7 @@ export default class Database {
         data.$greaterThanOrEqual?.forEach(key => filters.push(this.#filter('GREATER_THAN_OR_EQUAL', key, data[ key ])));
 
         Object.keys(data).forEach(key =>
-            !filters.find(filter => filter.fieldFilter.field.fieldPath === key) ?
+            !key.startsWith('$') && !filters.find(filter => filter.fieldFilter.field.fieldPath === key) ?
                 filters.push(this.#filter('EQUAL', key, data[ key ])) :
                 null
         );
@@ -233,18 +229,18 @@ export default class Database {
         return this;
     }
 
-    on (action: Action, collection: '*' | string, key: '*' | string, method: On): this {
-        this.#on.set(`${action}.${collection}.${key}`, method);
+    before (action: Action, collection: '*' | string, method: Before): this {
+        this.#before.set(`${action}.${collection}`, method);
         return this;
     }
 
     async set (collection: string, data: Data): Promise<void> {
+        if (!collection || typeof collection !== 'string') throw new Error('Set - collection string required');
         data = { ...data };
 
-        if (data.$on !== false) {
-            this.#on.get(`set.${collection}.*`)?.(data);
-            this.#on.get(`set.*.*`)?.(data);
-            this.#on.get(`*.*.*`)?.(data);
+        if (data.$before !== false) {
+            this.#before.get(`set.${collection}`)?.(data, collection);
+            this.#before.get(`set.*`)?.(data, collection);
         }
 
         const fieldPaths: Array<string> = [];
@@ -252,13 +248,6 @@ export default class Database {
         let updateTransforms: Array<FieldTransform> | undefined;
 
         for (const key in data) {
-
-            if (data.$on !== false) {
-                this.#on.get(`set.${collection}.${key}`)?.(data);
-                this.#on.get(`set.*.${key}`)?.(data);
-                this.#on.get(`*.*.${key}`)?.(data);
-            }
-
             if (key.startsWith('$')) continue;
 
             const value = data[ key ];
@@ -296,41 +285,27 @@ export default class Database {
         await this.#fetch('POST', `:commit`, body);
     }
 
-    async create (collection: string, data: Data): Promise<ResultRecord> {
+    async create (collection: string, data: Data): Promise<Result> {
+        if (!collection || typeof collection !== 'string') throw new Error('Create - collection string required');
         data = { ...data };
 
-        if (data.$on !== false) {
-            this.#on.get(`create.${collection}.*`)?.(data);
-            this.#on.get(`create.*.*`)?.(data);
-            this.#on.get(`*.*.*`)?.(data);
+        if (data.$before !== false) {
+            this.#before.get(`create.${collection}`)?.(data, collection);
+            this.#before.get(`create.*`)?.(data, collection);
         }
 
         const fields: Record<string, Value> = {};
         for (const key in data) {
-
-            if (data.$on !== false) {
-                this.#on.get(`create.${collection}.${key}`)?.(data);
-                this.#on.get(`create.*.${key}`)?.(data);
-                this.#on.get(`*.*.${key}`)?.(data);
-            }
-
             if (key.startsWith('$')) continue;
-
             const value = data[ key ];
             if (value === undefined) throw new Error(`Create - property ${key} undefined`);
-
             fields[ key ] = this.#value(value);
         }
 
-        if (!this.#valid(data)) throw new Error('Create - data format not valid');
-
-        if (data.$id) {
-            const post = await this.#fetch('POST', `/${collection}/?documentId=${data.$id}`, { fields });
-            return post.fields ? this.#parse(post.fields) : null;
-        }
+        if (!data.$identifier) throw new Error('Create - property $identifier required');
+        if (typeof data.$identifier !== 'string') throw new Error('Create - property $identifier string required');
 
         const { name } = await this.#query(collection, data);
-
         if (name) throw new Error('Create - document found'); // maybe null insted
 
         const post = await this.#fetch('POST', `/${collection}`, { fields });
@@ -338,35 +313,23 @@ export default class Database {
         return this.#parse(post.fields);
     }
 
-    async remove (collection: string, data: Data): Promise<ResultRecord | null> {
+    async remove (collection: string, data: Data): Promise<Result | null> {
+        if (!collection || typeof collection !== 'string') throw new Error('Remove - collection string required');
         data = { ...data };
 
-        if (data.$on !== false) {
-            this.#on.get(`remove.${collection}.*`)?.(data);
-            this.#on.get(`remove.*.*`)?.(data);
-            this.#on.get(`*.*.*`)?.(data);
+        if (data.$before !== false) {
+            this.#before.get(`remove.${collection}`)?.(data, collection);
+            this.#before.get(`remove.*`)?.(data, collection);
         }
 
         for (const key in data) {
-
-            if (data.$on !== false) {
-                this.#on.get(`remove.${collection}.${key}`)?.(data);
-                this.#on.get(`remove.*.${key}`)?.(data);
-                this.#on.get(`*.*.${key}`)?.(data);
-            }
-
             if (key.startsWith('$')) continue;
-
             const value = data[ key ];
             if (value === undefined) throw new Error(`Remove - property ${key} undefined`);
         }
 
-        if (!this.#valid(data)) throw new Error('Remove - data format not valid');
-
-        if (data.$id) {
-            await this.#fetch('DELETE', `/${collection}/${data.$id}`);
-            return null;
-        }
+        if (!data.$identifier) throw new Error('Remove - property $identifier required');
+        if (typeof data.$identifier !== 'string') throw new Error('Remove - property $identifier string required');
 
         const { name, result } = await this.#query(collection, data);
         if (!name) return null;
@@ -377,35 +340,23 @@ export default class Database {
         return this.#parse(result);
     }
 
-    async view (collection: string, data: Data): Promise<ResultRecord | null> {
+    async view (collection: string, data: Data): Promise<Result | null> {
+        if (!collection || typeof collection !== 'string') throw new Error('View - collection string required');
         data = { ...data };
 
-        if (data.$on !== false) {
-            this.#on.get(`view.${collection}.*`)?.(data);
-            this.#on.get(`view.*.*`)?.(data);
-            this.#on.get(`*.*.*`)?.(data);
+        if (data.$before !== false) {
+            this.#before.get(`view.${collection}`)?.(data, collection);
+            this.#before.get(`view.*`)?.(data, collection);
         }
 
         for (const key in data) {
-
-            if (data.$on !== false) {
-                this.#on.get(`view.${collection}.${key}`)?.(data);
-                this.#on.get(`view.*.${key}`)?.(data);
-                this.#on.get(`*.*.${key}`)?.(data);
-            }
-
             if (key.startsWith('$')) continue;
-
             const value = data[ key ];
             if (value === undefined) throw new Error(`View - property ${key} undefined`);
         }
 
-        if (!this.#valid(data)) throw new Error('View - data format not valid');
-
-        if (data.$id) {
-            const get = await this.#fetch('GET', `/${collection}/${data.$id}`);
-            return get?.fields ? this.#parse(get?.fields) : null;
-        }
+        if (!data.$identifier) throw new Error('View - property $identifier required');
+        if (typeof data.$identifier !== 'string') throw new Error('View - property $identifier string required');
 
         const { name, result } = await this.#query(collection, data);
         if (!name) return null;
@@ -413,42 +364,29 @@ export default class Database {
         return this.#parse(result);
     }
 
-    async update (collection: string, data: Data): Promise<ResultRecord | null> {
+    async update (collection: string, data: Data): Promise<Result | null> {
+        if (!collection || typeof collection !== 'string') throw new Error('Update - collection string required');
         data = { ...data };
 
-        if (data.$on !== false) {
-            this.#on.get(`update.${collection}.*`)?.(data);
-            this.#on.get(`update.*.*`)?.(data);
-            this.#on.get(`*.*.*`)?.(data);
+        if (data.$before !== false) {
+            this.#before.get(`update.${collection}`)?.(data, collection);
+            this.#before.get(`update.*`)?.(data, collection);
         }
 
         const fields: Record<string, Value> = {};
         let mask = '?currentDocument.exists=true';
 
         for (const key in data) {
-
-            if (data.$on !== false) {
-                this.#on.get(`update.${collection}.${key}`)?.(data);
-                this.#on.get(`update.*.${key}`)?.(data);
-                this.#on.get(`*.*.${key}`)?.(data);
-            }
-
             if (key.startsWith('$')) continue;
-
             mask += `&updateMask.fieldPaths=${key}`;
-
             const value = data[ key ];
             if (value === undefined) continue;
-
             fields[ key ] = this.#value(value);
         }
 
-        if (!this.#valid(data)) throw new Error('Update - data format not valid');
-
-        if (data.$id) {
-            const patch = await this.#fetch('PATCH', `/${collection}/${data.$id}${mask}`, { fields });
-            return patch.fields ? this.#parse(patch.fields) : null;
-        }
+        if (mask.length === 28) throw new Error('Update - properties required');
+        if (!data.$identifier) throw new Error('Update - property $identifier required');
+        if (typeof data.$identifier !== 'string') throw new Error('Update - property $identifier string required');
 
         const { name } = await this.#query(collection, data);
         if (!name) return null;
@@ -456,36 +394,26 @@ export default class Database {
         const id = name.split('/').slice(-1)[ 0 ];
         const patch = await this.#fetch('PATCH', `/${collection}/${id}${mask}`, { fields });
 
-        if (!patch.fields) return null;
+        if (!patch.fields) return {};
 
         return this.#parse(patch.fields);
     }
 
-    async search (collection: string, data: Data): Promise<ResultArray> {
+    async search (collection: string, data: Data): Promise<Results> {
+        if (!collection || typeof collection !== 'string') throw new Error('Search - collection string required');
         data = { ...data };
 
-        if (data.$on !== false) {
-            this.#on.get(`search.${collection}.*`)?.(data);
-            this.#on.get(`search.*.*`)?.(data);
-            this.#on.get(`*.*.*`)?.(data);
+        if (data.$before !== false) {
+            this.#before.get(`search.${collection}`)?.(data, collection);
+            this.#before.get(`search.*`)?.(data, collection);
         }
 
         const filters: Filters = [];
         for (const key in data) {
-
-            if (data.$on !== false) {
-                this.#on.get(`search.${collection}.${key}`)?.(data);
-                this.#on.get(`search.*.${key}`)?.(data);
-                this.#on.get(`*.*.${key}`)?.(data);
-            }
-
             if (key.startsWith('$')) continue;
-
             const value = data[ key ];
             if (value === undefined) throw new Error(`Search - property ${key} undefined`);
         }
-
-        if ('$id' in data) throw new Error('Search - $id property not a valid option');
 
         let orderBy: OrderBy | undefined = [];
         let startAt: StartAt | undefined = { values: [] };
@@ -517,6 +445,12 @@ export default class Database {
         data.$arrayContainsAny?.forEach(key => filters.push(this.#filter('ARRAY_CONTAINS_ANY', key, data[ key ])));
         data.$greaterThan?.forEach(key => filters.push(this.#filter('GREATER_THAN', key, data[ key ])));
         data.$greaterThanOrEqual?.forEach(key => filters.push(this.#filter('GREATER_THAN_OR_EQUAL', key, data[ key ])));
+
+        Object.keys(data).forEach(key =>
+            !key.startsWith('$') && !filters.find(filter => filter.fieldFilter.field.fieldPath === key) ?
+                filters.push(this.#filter('EQUAL', key, data[ key ])) :
+                null
+        );
 
         if (!filters.length) throw new Error('Search - requires filters');
 
