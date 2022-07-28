@@ -42,11 +42,11 @@ This is all the options for the data parameter. The `$` character marks a reserv
 ```ts
 type Data = {
 
-    // All: override on event
+    // All: false overrides event
     $on?: boolean;
 
     // All Except Search:
-    $id?: string;
+    $identifier?: string;
 
     // Set: property name/s to increment
     // https://firebase.google.com/docs/firestore/reference/rest/v1/Write#FieldTransform.FIELDS.increment

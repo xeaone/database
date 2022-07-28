@@ -56,18 +56,17 @@ export type FieldTransform = {
     appendMissingElements?: ArrayValue;
 };
 
-export type After = (data: Data, collection: string) => void;
-export type Before = (data: Data, collection: string) => void;
-export type Action = '*' | 'set' | 'view' | 'search' | 'create' | 'update' | 'remove';
+export type On = (data: Data, collection: string) => void;
 export type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+export type Action = 'set' | 'view' | 'search' | 'create' | 'update' | 'remove';
 
 export type Results = Array<any>;
 export type Result = Record<string, any>;
 
 export type Data = {
 
-    // All: override before event
-    $before?: boolean;
+    // All: false overrides the event
+    $on?: boolean;
 
     // All Except Search: Overrides filters
     $identifier?: string;

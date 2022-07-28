@@ -2,7 +2,7 @@ import jwt from './jwt.ts';
 
 import {
     Key, From, Data, Value, Direction,
-    Options, Results, Result, Before, Method, Action,
+    Options, Results, Result, On, Method, Action,
     EndAt, OrderBy, StartAt, Where, FieldFilter, Filters, Order, Operator, FieldTransform, ArrayValue
 } from './types.ts';
 
@@ -12,8 +12,7 @@ export default class Database {
     #token?: string;
     #expires?: number;
     #project?: string;
-    #after: Map<string, Before> = new Map();
-    #before: Map<string, Before> = new Map();
+    #on: Map<string, On> = new Map();
 
     #properties = [
         'integerValue', 'doubleValue',
@@ -91,27 +90,6 @@ export default class Database {
         }
 
         return value;
-    }
-
-    #valid (data: Data): boolean {
-        return 'id' in data === false && (
-            '$startsWith' in data ||
-            '$in' in data ||
-            '$notIn' in data ||
-            '$equal' in data ||
-            '$notEqual' in data ||
-            '$lessThan' in data ||
-            '$arrayContains' in data ||
-            '$lessThanOrEqual' in data ||
-            '$arrayContainsAny' in data ||
-            '$greaterThan' in data ||
-            '$greaterThanOrEqual' in data ||
-            '$start' in data ||
-            '$end' in data ||
-            '$limit' in data ||
-            '$offset' in data ||
-            '$descending' in data ||
-            '$ascending' in data) ? false : true;
     }
 
     async #query (collection: string, data: Data) {
@@ -229,8 +207,8 @@ export default class Database {
         return this;
     }
 
-    before (action: Action, collection: '*' | string, method: Before): this {
-        this.#before.set(`${action}.${collection}`, method);
+    on (action: Action, method: On): this {
+        this.#on.set(action, method);
         return this;
     }
 
@@ -238,10 +216,7 @@ export default class Database {
         if (!collection || typeof collection !== 'string') throw new Error('Set - collection string required');
         data = { ...data };
 
-        if (data.$before !== false) {
-            this.#before.get(`set.${collection}`)?.(data, collection);
-            this.#before.get(`set.*`)?.(data, collection);
-        }
+        if (data.$on !== false) await this.#on.get('set')?.(data, collection);
 
         const fieldPaths: Array<string> = [];
         const fields: Record<string, Value> = {};
@@ -270,9 +245,7 @@ export default class Database {
             fields[ key ] = this.#value(value);
         }
 
-        // if (!data.$id) throw new Error('Set - $id required');
-
-        const id = data.$id ? `/${data.$id}` : '';
+        const id = data.$identifier ? `/${data.$identifier}` : '';
         const name = `projects/${this.#project}/databases/(default)/documents/${collection}${id}`;
         const body = {
             writes: [ {
@@ -289,10 +262,7 @@ export default class Database {
         if (!collection || typeof collection !== 'string') throw new Error('Create - collection string required');
         data = { ...data };
 
-        if (data.$before !== false) {
-            this.#before.get(`create.${collection}`)?.(data, collection);
-            this.#before.get(`create.*`)?.(data, collection);
-        }
+        if (data.$on !== false) await this.#on.get('create')?.(data, collection);
 
         const fields: Record<string, Value> = {};
         for (const key in data) {
@@ -317,10 +287,7 @@ export default class Database {
         if (!collection || typeof collection !== 'string') throw new Error('Remove - collection string required');
         data = { ...data };
 
-        if (data.$before !== false) {
-            this.#before.get(`remove.${collection}`)?.(data, collection);
-            this.#before.get(`remove.*`)?.(data, collection);
-        }
+        if (data.$on !== false) await this.#on.get('remove')?.(data, collection);
 
         for (const key in data) {
             if (key.startsWith('$')) continue;
@@ -344,10 +311,7 @@ export default class Database {
         if (!collection || typeof collection !== 'string') throw new Error('View - collection string required');
         data = { ...data };
 
-        if (data.$before !== false) {
-            this.#before.get(`view.${collection}`)?.(data, collection);
-            this.#before.get(`view.*`)?.(data, collection);
-        }
+        if (data.$on !== false) await this.#on.get('view')?.(data, collection);
 
         for (const key in data) {
             if (key.startsWith('$')) continue;
@@ -368,10 +332,7 @@ export default class Database {
         if (!collection || typeof collection !== 'string') throw new Error('Update - collection string required');
         data = { ...data };
 
-        if (data.$before !== false) {
-            this.#before.get(`update.${collection}`)?.(data, collection);
-            this.#before.get(`update.*`)?.(data, collection);
-        }
+        if (data.$on !== false) await this.#on.get('update')?.(data, collection);
 
         const fields: Record<string, Value> = {};
         let mask = '?currentDocument.exists=true';
@@ -403,10 +364,7 @@ export default class Database {
         if (!collection || typeof collection !== 'string') throw new Error('Search - collection string required');
         data = { ...data };
 
-        if (data.$before !== false) {
-            this.#before.get(`search.${collection}`)?.(data, collection);
-            this.#before.get(`search.*`)?.(data, collection);
-        }
+        if (data.$on !== false) await this.#on.get('search')?.(data, collection);
 
         const filters: Filters = [];
         for (const key in data) {
