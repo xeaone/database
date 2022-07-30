@@ -62,45 +62,38 @@ database.project(project);
 // const removeUser = await database.remove(collection, { id: user.id, account: user.account });
 // console.log('remove', compare(removeUser, user));
 
+/*
+    Create
+*/
+// const createUser = await database.create('users', { id: '1', num: 1, greet: 'hello world' }).equal({ id: '1' }).end();
+// console.log('create', createUser);
 
 /*
     Search
 */
-// const searchUser = await database.search(collection, { greet: 'hello', $startsWith: [ 'greet' ], $descending: [ 'greet' ] });
-// const searchUser = await database.search(collection, { account: '2', $equal: [ 'account' ] });
+// const searchUser = await database.search(collection).startsWith({ greet: 'hello' }).end();
 // console.log('search', searchUser);
-
-
-/*
-    View
-*/
-// const viewIdUser = await database.view('users', { $id: '1000' }); // not exist
-// console.log(viewIdUser);
-// const viewWhereUser = await database.view('users', { account: '2', $equal: [ 'account' ] }); // should exists
-// console.log(viewWhereUser);
-
-
-/*
-    Remove non exist
-*/
-// const removeIdUser = await database.remove('users', { $id: '1000' });
-// console.log(removeIdUser);
-
 
 /*
     Update
 */
-// const updateUser = await database.update('users', { id: '2', num: 100 }, { where: { id: 'e' } });
+// const updateUser = await database.update('users', { num: 10 }).equal({ id: '1' }).end();
 // console.log('update', updateUser);
 
+/*
+    View
+*/
+// const viewUser = await database.view('users').equal({ id: '1' }).end();
+// console.log('view', viewUser);
 
 /*
-    Set
+    Remove
 */
-// const result = await database.set('users', { set: 'bar', inc: 10 }, { id: 'a422c84f-3e76-4a60-bf14-fb8749a15b68', increment: [ 'inc' ] });
-// console.log(result);
+// const removeUser = await database.remove('users').equal({ id: '1' }).end();
+// console.log('remove', removeUser);
 
-await database.set('users', { set: 'bar', inc: 1, ar: [ 2 ], $id: '8803823c-8cb4-4198-8880-7565ef09cbdd', $increment: [ 'inc' ], $append: [ 'ar' ] });
-const view = await database.view('users', { $id: '8803823c-8cb4-4198-8880-7565ef09cbdd' });
-const update = await database.update('users', { $id: '8803823c-8cb4-4198-8880-7565ef09cbdd' });
-console.log(view, update);
+/*
+    Commit
+*/
+// const commitUser = await database.commit('users', { commit: 'c' }).identifier('31538b8d-410c-4a83-8c2c-671190df1bbd').increment({ num: 1 }).end();
+// console.log('commit', commitUser);

@@ -1,10 +1,9 @@
+import { Key, Data, Value, Options, Method } from './types.ts';
+import { parse, serialize } from './util.ts';
+import Commit from './commit.ts';
+import Search from './search.ts';
+import Query from './query.ts';
 import jwt from './jwt.ts';
-
-import {
-    Key, From, Data, Value, Direction,
-    Options, Results, Result, On, Method, Action,
-    EndAt, OrderBy, StartAt, Where, FieldFilter, Filters, Order, Operator, FieldTransform, ArrayValue
-} from './types.ts';
 
 export default class Database {
 
@@ -12,132 +11,10 @@ export default class Database {
     #token?: string;
     #expires?: number;
     #project?: string;
-    #on: Map<string, On> = new Map();
-
-    #properties = [
-        'integerValue', 'doubleValue',
-        'arrayValue', 'bytesValue', 'booleanValue', 'geoPointValue',
-        'mapValue', 'nullValue', 'referenceValue', 'stringValue', 'timestampValue'
-    ];
 
     constructor (options?: Options) {
         this.#key = this.#key ?? options?.key;
         this.#project = this.#project ?? options?.project;
-    }
-
-    #value (value: any): Value {
-        if (value === null)
-            return { nullValue: value };
-        if (typeof value === 'string')
-            return { stringValue: value };
-        if (typeof value === 'boolean')
-            return { booleanValue: value };
-        if (typeof value === 'number' && value % 1 !== 0)
-            return { doubleValue: value };
-        if (typeof value === 'number' && value % 1 === 0)
-            return { integerValue: `${value}` };
-        if (value instanceof Date)
-            return { timestampValue: value.toISOString() };
-        if (value instanceof Array)
-            return { arrayValue: { values: value.map(this.#value) } };
-        if (typeof value === 'object')
-            return { mapValue: { fields: Object.fromEntries(Object.entries(value).map(([ k, v ]) => [ k, this.#value(v) ])) } };
-        throw new Error(`value not allowed ${value}`);
-    }
-
-    #order (key: string, direction: Direction): Order {
-        return { field: { fieldPath: key }, direction };
-    }
-
-    #filter (operator: Operator, key: string, value: any): FieldFilter {
-        return {
-            fieldFilter: {
-                op: operator,
-                field: { fieldPath: key },
-                value: this.#value(value),
-            }
-        };
-    }
-
-    #parse (value: any): any {
-        const keys = Object.keys(value);
-        const property = keys.find(key => this.#properties.includes(key));
-
-        if (property === 'nullValue') {
-            value = null;
-        } else if (property === 'booleanValue') {
-            return value[ property ];
-        } else if (property === 'integerValue') {
-            return Number(value[ property ]);
-        } else if (property === 'doubleValue') {
-            return value[ property ];
-        } else if (property === 'arrayValue') {
-            return (value[ property ] && value[ property ].values || []).map(this.#parse.bind(this));
-        } else if (property === 'mapValue') {
-            return this.#parse(value[ property ] && value[ property ].fields || {});
-        } else if (property === 'geoPointValue') {
-            return { latitude: 0, longitude: 0, ...value[ property ] };
-        } else if (property === 'timestampValue') {
-            return new Date(value[ property ]);
-        } else if (property === 'stringValue') {
-            return value[ property ];
-        } else if (value === undefined) {
-            return undefined;
-        } else if (property === 'referenceValue' || property === 'byteValue') {
-            throw new Error(`${property} not implenmeted yet`);
-        } else if (typeof value === 'object') {
-            keys.forEach(key => value[ key ] = this.#parse(value[ key ]));
-        }
-
-        return value;
-    }
-
-    async #query (collection: string, data: Data) {
-        const filters: Array<FieldFilter> = [];
-
-        data.$startsWith?.forEach(key => {
-            const start = data[ key ];
-            const length = start.length;
-            const startPart = start.slice(0, length - 1);
-            const endPart = start.slice(length - 1, length);
-            const end = startPart + String.fromCharCode(endPart.charCodeAt(0) + 1);
-            filters.push(this.#filter('GREATER_THAN_OR_EQUAL', key, start));
-            filters.push(this.#filter('LESS_THAN', key, end));
-        });
-
-        data.$in?.forEach(key => filters.push(this.#filter('IN', key, data[ key ])));
-        data.$notIn?.forEach(key => filters.push(this.#filter('NOT_IN', key, data[ key ])));
-        data.$equal?.forEach(key => filters.push(this.#filter('EQUAL', key, data[ key ])));
-        data.$notEqual?.forEach(key => filters.push(this.#filter('NOT_EQUAL', key, data[ key ])));
-        data.$lessThan?.forEach(key => filters.push(this.#filter('LESS_THAN', key, data[ key ])));
-        data.$lessThanOrEqual?.forEach(key => filters.push(this.#filter('LESS_THAN_OR_EQUAL', key, data[ key ])));
-        data.$arrayContains?.forEach(key => filters.push(this.#filter('ARRAY_CONTAINS', key, data[ key ])));
-        data.$arrayContainsAny?.forEach(key => filters.push(this.#filter('ARRAY_CONTAINS_ANY', key, data[ key ])));
-        data.$greaterThan?.forEach(key => filters.push(this.#filter('GREATER_THAN', key, data[ key ])));
-        data.$greaterThanOrEqual?.forEach(key => filters.push(this.#filter('GREATER_THAN_OR_EQUAL', key, data[ key ])));
-
-        Object.keys(data).forEach(key =>
-            !key.startsWith('$') && !filters.find(filter => filter.fieldFilter.field.fieldPath === key) ?
-                filters.push(this.#filter('EQUAL', key, data[ key ])) :
-                null
-        );
-
-        if (!filters.length) throw new Error('Query - requires filters');
-
-        const limit = 1;
-        const from: From = [ { collectionId: collection } ];
-        const where: Where = { compositeFilter: { op: 'AND', filters } };
-        const body = { structuredQuery: { from, where, limit } };
-        const query = await this.#fetch('POST', ':runQuery', body);
-
-        const error = query[ 0 ]?.error;
-        if (error) throw new Error(JSON.stringify(error, null, '\t'));
-
-        const document = query[ 0 ]?.document;
-        const name = document?.name ?? null;
-        const result = document?.fields ?? null;
-
-        return { name, result };
     }
 
     async #auth () {
@@ -188,11 +65,8 @@ export default class Database {
 
         const result = await response.json();
 
-        if (method === 'GET' && result?.error?.code === 404) return null;
-
-        if (result.error) {
-            throw new Error(JSON.stringify(result.error, null, '\t'));
-        }
+        const error = result?.error ?? result?.[ 0 ]?.error;
+        if (error) throw new Error(JSON.stringify(error, null, '\t'));
 
         return result;
     }
@@ -207,226 +81,120 @@ export default class Database {
         return this;
     }
 
-    on (action: Action, method: On): this {
-        this.#on.set(action, method);
-        return this;
+    view (collection: string): Query {
+        return new Query(collection, async (body) => {
+            const query = await this.#fetch('POST', ':runQuery', body);
+            const document = query[ 0 ]?.document;
+            const name = document?.name;
+
+            if (!name) throw new Error('View - document not found');
+
+            if (!document.fields) return {};
+            return parse(document.fields);
+        }, async (identifier) => {
+            const document = await this.#fetch('GET', `/${collection}/${identifier}`);
+
+            if (!document.fields) return {};
+            return parse(document.fields);
+        });
     }
 
-    async set (collection: string, data: Data): Promise<void> {
-        if (!collection || typeof collection !== 'string') throw new Error('Set - collection string required');
-        data = { ...data };
+    remove (collection: string): Query {
+        return new Query(collection, async (body) => {
+            const query = await this.#fetch('POST', ':runQuery', body);
+            const document = query[ 0 ]?.document;
+            const name = document?.name;
 
-        if (data.$on !== false) await this.#on.get('set')?.(data, collection);
+            if (!name) throw new Error('Remove - document not found');
 
-        const fieldPaths: Array<string> = [];
-        const fields: Record<string, Value> = {};
-        let updateTransforms: Array<FieldTransform> | undefined;
+            const identifier = name.split('/').slice(-1)[ 0 ];
+            await this.#fetch('DELETE', `/${collection}/${identifier}`);
 
-        for (const key in data) {
-            if (key.startsWith('$')) continue;
-
-            const value = data[ key ];
-            if (value === undefined) throw new Error(`Set - property ${key} undefined`);
-
-            if (data.$append?.includes(key)) {
-                updateTransforms = updateTransforms ?? [];
-                const appendMissingElements = (this.#value(value) as { arrayValue: ArrayValue; })?.arrayValue;
-                updateTransforms.push({ fieldPath: key, appendMissingElements });
-                continue;
-            }
-
-            if (data.$increment?.includes(key)) {
-                updateTransforms = updateTransforms ?? [];
-                updateTransforms.push({ fieldPath: key, increment: this.#value(value) });
-                continue;
-            }
-
-            fieldPaths.push(key);
-            fields[ key ] = this.#value(value);
-        }
-
-        const id = data.$identifier ? `/${data.$identifier}` : '';
-        const name = `projects/${this.#project}/databases/(default)/documents/${collection}${id}`;
-        const body = {
-            writes: [ {
-                updateTransforms,
-                update: { fields, name },
-                updateMask: { fieldPaths },
-            } ]
-        };
-
-        await this.#fetch('POST', `:commit`, body);
+            // if (!document.fields) return {};
+            // return parse(document.fields);
+        }, async (identifier) => {
+            await this.#fetch('DELETE', `/${collection}/${identifier}`);
+        });
     }
 
-    async create (collection: string, data: Data): Promise<Result> {
-        if (!collection || typeof collection !== 'string') throw new Error('Create - collection string required');
-        data = { ...data };
+    create (collection: string, data: Data): Query {
 
-        if (data.$on !== false) await this.#on.get('create')?.(data, collection);
-
+        let valid = false;
         const fields: Record<string, Value> = {};
         for (const key in data) {
-            if (key.startsWith('$')) continue;
             const value = data[ key ];
-            if (value === undefined) throw new Error(`Create - property ${key} undefined`);
-            fields[ key ] = this.#value(value);
+            if (value === undefined) continue;
+            fields[ key ] = serialize(value);
+            valid = true;
         }
 
-        if (!data.$identifier) throw new Error('Create - property $identifier required');
-        if (typeof data.$identifier !== 'string') throw new Error('Create - property $identifier string required');
+        if (!valid) throw new Error('Create - data required');
 
-        const { name } = await this.#query(collection, data);
-        if (name) throw new Error('Create - document found'); // maybe null insted
+        return new Query(collection, async (body) => {
+            const query = await this.#fetch('POST', ':runQuery', body);
+            const document = query[ 0 ]?.document;
+            const name = document?.name;
 
-        const post = await this.#fetch('POST', `/${collection}`, { fields });
+            if (name) throw new Error('Create - document is found');
 
-        return this.#parse(post.fields);
+            const post = await this.#fetch('POST', `/${collection}`, { fields }); // consider allowing id
+
+            if (!post.fields) return {};
+            return parse(post.fields);
+        }, async (identifier) => {
+            const post = await this.#fetch('POST', `/${collection}/${identifier}`, { fields });
+            return parse(post.fields);
+        });
     }
 
-    async remove (collection: string, data: Data): Promise<Result | null> {
-        if (!collection || typeof collection !== 'string') throw new Error('Remove - collection string required');
-        data = { ...data };
+    update (collection: string, data: Data): Query {
 
-        if (data.$on !== false) await this.#on.get('remove')?.(data, collection);
-
-        for (const key in data) {
-            if (key.startsWith('$')) continue;
-            const value = data[ key ];
-            if (value === undefined) throw new Error(`Remove - property ${key} undefined`);
-        }
-
-        if (!data.$identifier) throw new Error('Remove - property $identifier required');
-        if (typeof data.$identifier !== 'string') throw new Error('Remove - property $identifier string required');
-
-        const { name, result } = await this.#query(collection, data);
-        if (!name) return null;
-
-        const id = name.split('/').slice(-1)[ 0 ];
-        await this.#fetch('DELETE', `/${collection}/${id}`);
-
-        return this.#parse(result);
-    }
-
-    async view (collection: string, data: Data): Promise<Result | null> {
-        if (!collection || typeof collection !== 'string') throw new Error('View - collection string required');
-        data = { ...data };
-
-        if (data.$on !== false) await this.#on.get('view')?.(data, collection);
-
-        for (const key in data) {
-            if (key.startsWith('$')) continue;
-            const value = data[ key ];
-            if (value === undefined) throw new Error(`View - property ${key} undefined`);
-        }
-
-        if (!data.$identifier) throw new Error('View - property $identifier required');
-        if (typeof data.$identifier !== 'string') throw new Error('View - property $identifier string required');
-
-        const { name, result } = await this.#query(collection, data);
-        if (!name) return null;
-
-        return this.#parse(result);
-    }
-
-    async update (collection: string, data: Data): Promise<Result | null> {
-        if (!collection || typeof collection !== 'string') throw new Error('Update - collection string required');
-        data = { ...data };
-
-        if (data.$on !== false) await this.#on.get('update')?.(data, collection);
-
+        let valid = false;
+        let mask = 'currentDocument.exists=true';
         const fields: Record<string, Value> = {};
-        let mask = '?currentDocument.exists=true';
-
         for (const key in data) {
-            if (key.startsWith('$')) continue;
+            valid = true;
             mask += `&updateMask.fieldPaths=${key}`;
             const value = data[ key ];
             if (value === undefined) continue;
-            fields[ key ] = this.#value(value);
+            fields[ key ] = serialize(value);
         }
 
-        if (mask.length === 28) throw new Error('Update - properties required');
-        if (!data.$identifier) throw new Error('Update - property $identifier required');
-        if (typeof data.$identifier !== 'string') throw new Error('Update - property $identifier string required');
+        if (!valid) throw new Error('Update - data required');
 
-        const { name } = await this.#query(collection, data);
-        if (!name) return null;
+        return new Query(collection, async (body) => {
+            const query = await this.#fetch('POST', ':runQuery', body);
+            const document = query[ 0 ]?.document;
+            const name = document?.name;
 
-        const id = name.split('/').slice(-1)[ 0 ];
-        const patch = await this.#fetch('PATCH', `/${collection}/${id}${mask}`, { fields });
+            if (!name) throw new Error('Update - document not found');
 
-        if (!patch.fields) return {};
+            const identifier = name.split('/').slice(-1)[ 0 ];
+            const patch = await this.#fetch('PATCH', `/${collection}/${identifier}?${mask}`, { fields });
 
-        return this.#parse(patch.fields);
+            if (!patch.fields) return {};
+            return parse(patch.fields);
+        }, async (identifier) => {
+            const patch = await this.#fetch('PATCH', `/${collection}/${identifier}?${mask}`, { fields });
+
+            if (!patch.fields) return {};
+            return parse(patch.fields);
+        });
     }
 
-    async search (collection: string, data: Data): Promise<Results> {
-        if (!collection || typeof collection !== 'string') throw new Error('Search - collection string required');
-        data = { ...data };
-
-        if (data.$on !== false) await this.#on.get('search')?.(data, collection);
-
-        const filters: Filters = [];
-        for (const key in data) {
-            if (key.startsWith('$')) continue;
-            const value = data[ key ];
-            if (value === undefined) throw new Error(`Search - property ${key} undefined`);
-        }
-
-        let orderBy: OrderBy | undefined = [];
-        let startAt: StartAt | undefined = { values: [] };
-        let endAt: EndAt | undefined = { values: [] };
-
-        data.$ascending?.forEach(key => orderBy?.push(this.#order(key, 'ASCENDING')));
-        data.$descending?.forEach(key => orderBy?.push(this.#order(key, 'DESCENDING')));
-
-        data.$start?.forEach(cursor => startAt?.values?.push(this.#value(cursor)));
-        data.$end?.forEach(cursor => endAt?.values?.push(this.#value(cursor)));
-
-        data.$startsWith?.forEach(key => {
-            const start = data[ key ];
-            const length = start.length;
-            const startPart = start.slice(0, length - 1);
-            const endPart = start.slice(length - 1, length);
-            const end = startPart + String.fromCharCode(endPart.charCodeAt(0) + 1);
-            filters.push(this.#filter('GREATER_THAN_OR_EQUAL', key, start));
-            filters.push(this.#filter('LESS_THAN', key, end));
+    search (collection: string): Search {
+        return new Search(collection, async (body) => {
+            const query = await this.#fetch('POST', ':runQuery', body);
+            if (!query[ 0 ]?.document?.fields) return [];
+            return query.map((entity: any) => parse(entity.document.fields));
         });
+    }
 
-        data.$in?.forEach(key => filters.push(this.#filter('IN', key, data[ key ])));
-        data.$notIn?.forEach(key => filters.push(this.#filter('NOT_IN', key, data[ key ])));
-        data.$equal?.forEach(key => filters.push(this.#filter('EQUAL', key, data[ key ])));
-        data.$notEqual?.forEach(key => filters.push(this.#filter('NOT_EQUAL', key, data[ key ])));
-        data.$lessThan?.forEach(key => filters.push(this.#filter('LESS_THAN', key, data[ key ])));
-        data.$lessThanOrEqual?.forEach(key => filters.push(this.#filter('LESS_THAN_OR_EQUAL', key, data[ key ])));
-        data.$arrayContains?.forEach(key => filters.push(this.#filter('ARRAY_CONTAINS', key, data[ key ])));
-        data.$arrayContainsAny?.forEach(key => filters.push(this.#filter('ARRAY_CONTAINS_ANY', key, data[ key ])));
-        data.$greaterThan?.forEach(key => filters.push(this.#filter('GREATER_THAN', key, data[ key ])));
-        data.$greaterThanOrEqual?.forEach(key => filters.push(this.#filter('GREATER_THAN_OR_EQUAL', key, data[ key ])));
-
-        Object.keys(data).forEach(key =>
-            !key.startsWith('$') && !filters.find(filter => filter.fieldFilter.field.fieldPath === key) ?
-                filters.push(this.#filter('EQUAL', key, data[ key ])) :
-                null
-        );
-
-        if (!filters.length) throw new Error('Search - requires filters');
-
-        orderBy = orderBy?.length ? orderBy : undefined;
-        endAt = endAt?.values?.length ? endAt : undefined;
-        startAt = startAt?.values?.length ? startAt : undefined;
-
-        const limit: number | undefined = data.$limit;
-        const offset: number | undefined = data.$offset;
-        const from: From = [ { collectionId: collection } ];
-        const where: Where = { compositeFilter: { op: 'AND', filters } };
-        const body = { structuredQuery: { from, where, limit, offset, orderBy, startAt, endAt } };
-        const query = await this.#fetch('POST', ':runQuery', body);
-
-        if (query[ 0 ]?.error) throw new Error(JSON.stringify(query[ 0 ]?.error, null, '\t'));
-        if (!query[ 0 ]?.document?.fields) return [];
-
-        return query.map((entity: any) => this.#parse(entity.document.fields));
+    commit (collection: string, data: Data): Commit {
+        if (!this.#project) throw new Error('project required');
+        return new Commit(this.#project, collection, data, async body => {
+            await this.#fetch('POST', ':commit', body);
+        });
     }
 
 }
