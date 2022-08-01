@@ -137,12 +137,12 @@ export default class Database {
 
             if (name) throw new Error('Create - document is found');
 
-            const post = await this.#fetch('POST', `/${collection}`, { fields }); // consider allowing id
-
+            const post = await this.#fetch('POST', `/${collection}`, { fields });
             if (!post.fields) return {};
             return parse(post.fields);
         }, async (identifier) => {
-            const post = await this.#fetch('POST', `/${collection}/${identifier}`, { fields });
+            const post = await this.#fetch('POST', `/${collection}?documentId=${identifier}`, { fields });
+            if (!post.fields) return {};
             return parse(post.fields);
         });
     }
