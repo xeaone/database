@@ -61,6 +61,6 @@ export type Action = 'set' | 'view' | 'search' | 'create' | 'update' | 'remove';
 
 export type End = (result: any) => any;
 
-export type Results = Array<any>;
+// export type Results = Array<Record<string, any>>;
 export type Data = Record<string, any>;
 export type Result = Record<string, any>;

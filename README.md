@@ -16,109 +16,28 @@ const database = new Database();
 database.key(key);
 database.project(project);
 
-const user = await database.create('users', {
+const id = crypto.randomUUID();
+
+const user = await database.create('user', {
+    id,
     age: 20,
     phone: null,
     active: true,
     lastName: 'bar',
     firstName: 'foo',
-});
+}).identifier(id).end();
 
 console.log(user);
 
-const users = await database.search('users', {
-    $limit: 10,
-    $offset: 1,
-    firstName: 'foo',
-});
+const users = await database
+    .search('user')
+    .equal({ firstName: 'foo' })
+    .limit(10).end();
 
 console.log(user);
 ```
 
 ## API
-
-### `type Data`
-This is all the options for the data parameter. The `$` character marks a reserved property and will not be added to the database.
-```ts
-type Data = {
-
-    // All: false overrides event
-    $on?: boolean;
-
-    // All Except Search:
-    $identifier?: string;
-
-    // Set: property name/s to increment
-    // https://firebase.google.com/docs/firestore/reference/rest/v1/Write#FieldTransform.FIELDS.increment
-    $increment?: Array<string>;
-
-    // Set: property name/s to append missing elements
-    // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/Write#FieldTransform.FIELDS.append_missing_elements
-    $append?: Array<string>;
-
-    // Custom Filters - START
-    $startsWith?: Array<string>;
-    // Custom Filters - END
-
-
-    // Standard Filters - START
-
-    // All Except Set:
-    $in?: Array<string>;
-
-    // All Except Set:
-    $notIn?: Array<string>;
-
-    // All Except Set: default
-    $equal?: Array<string>;
-
-    // All Except Set:
-    $notEqual?: Array<string>;
-
-    // All Except Set:
-    $lessThan?: Array<string>;
-
-    // All Except Set:
-    $lessThanOrEqual?: Array<string>;
-
-    // All Except Set:
-    $arrayContains?: Array<string>;
-
-    // All Except Set:
-    $arrayContainsAny?: Array<string>;
-
-    // All Except Set:
-    $greaterThan?: Array<string>;
-
-    // All Except Set:
-    $greaterThanOrEqual?: Array<string>;
-
-    // Standard Filters - End
-
-
-    // Search: orders results by property name/s
-    $ascending?: Array<string>; // All except Set:
-    $descending?: Array<string>; // All except Set:
-
-    // Search:
-    // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.start_at
-    $start?: Array<Record<string, Data>>;
-
-    // Search:
-    // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.end_at
-    $end?: Array<Record<string, Data>>;
-
-    // Search: The maximum number of results to return.
-    // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.limit
-    $limit?: number;
-
-    // Search: The number of results to skip.
-    // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.offset
-    $offset?: number;
-
-    [ key: string ]: any;
-};
-```
 
 ### `project(project: string): this`
 Firestore project name.
@@ -126,45 +45,102 @@ Firestore project name.
 ### `key(key: string): this`
 Firestore service key.
 
-### `on (action: Action, collection: '*' | string, name: '*' | string, method: On): this`
+### `search(collection: string)`
 ```ts
-database.on('create', '*', '*', data => {
-    if (!data.account || typeof data.account !== 'string') throw new Error('account string required');
-    if (!data.created || typeof data.created !== 'number') throw new Error('created number required');
-    data.id = `${data.account}.${data.id ?? crypto.randomUUID()}`;
-});
+const users = await database.search('user').equal({ id: '1' }).end();
 ```
 
-### `view(collection: string, data: Data)`
+### `view(collection: string)`
 ```ts
-const user = await database.view('user', { id: '1' });
+const user = await database.view('user').equal({ id: '1' }).end();
 ```
 
-### `remove(collection: string, data: Data)`
+### `remove(collection: string)`
 ```ts
-const user = await database.remove('user', { id: '1' });
+const user = await database.remove('user').identifier('1').end();
 ```
 
 ### `create(collection: string, data: Data)`
 ```ts
-const user = await database.create('user', { id: '1', name: 'foo bar' });
+const user = await database.create('user', { id: '1', name: 'foo bar', age: 42 }).identifier('1').end();
 ```
 
 ### `update(collection: string, data: Data)`
 ```ts
-const user = await database.update('user', { id: '1', age: 69 });
+const user = await database.update('user', { age: 69 }).equal({ id: '1' }).end();
 ```
 
-### `search(collection: string, data: Data)`
+### `commit(collection: string, data: Data)`
 ```ts
-const users = await database.search('user', { age: 69 });
+const user = await database.commit('user').equal({ id: '1' }).increment({ age: 1 }).end();
 ```
 
-### `set(collection: string, data: Data)`
+### `Options`
 ```ts
-const user = await database.set('user', { id: '1', age: 1, $equal: [ 'id' ], $increment: [ 'age' ] });
-```
+// All Except Search:
+identifier(string)
 
+// All Except Set: Property starts with filter
+startsWith(Array<string>)
+
+// All Except Set:
+in(Array<string>)
+
+// All Except Set:
+notIn(Array<string>)
+
+// All Except Set: default
+equal(Array<string>)
+
+// All Except Set:
+notEqual(Array<string>)
+
+// All Except Set:
+lessThan(Array<string>)
+
+// All Except Set:
+lessThanOrEqual(Array<string>)
+
+// All Except Set:
+arrayContains(Array<string>)
+
+// All Except Set:
+arrayContainsAny(Array<string>)
+
+// All Except Set:
+greaterThan(Array<string>;
+
+// All Except Set:
+greaterThanOrEqual(Array<string>)
+
+// Search: orders results by property name/s
+ascending(Array<string>)
+descending(Array<string>)
+
+// Search:
+// Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.start_at
+start(Array<Record<string, Data>>)
+
+// Search:
+// Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.end_at
+end(Array<Record<string, Data>>)
+
+// Search: The maximum number of results to return.
+// Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.limit
+limit(number)
+
+// Search: The number of results to skip.
+// Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.offset
+offset(number)
+
+// Set: property name/s to increment
+// https://firebase.google.com/docs/firestore/reference/rest/v1/Write#FieldTransform.FIELDS.increment
+increment(Array<string>)
+
+// Set: property name/s to append missing elements
+// Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/Write#FieldTransform.FIELDS.append_missing_elements
+append(Array<string>)
+```
 <!--
 Firestore reset api docs
 https://firebase.google.com/docs/firestore/reference/rest/v1/projects.databases.documents

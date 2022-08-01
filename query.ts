@@ -31,19 +31,19 @@ export default class Query {
     }
 
     in (data: Data): this {
-        const op = 'ARRAY_CONTAINS';
+        const op = 'IN';
         for (const key in data) this.#filters.push({ fieldFilter: { field: { fieldPath: key }, op, value: serialize(data[ key ]) } });
         return this;
     }
 
     notIn (data: Data): this {
-        const op = 'LESS_THAN_OR_EQUAL';
+        const op = 'NOT_IN';
         for (const key in data) this.#filters.push({ fieldFilter: { field: { fieldPath: key }, op, value: serialize(data[ key ]) } });
         return this;
     }
 
     equal (data: Data): this {
-        const op = 'LESS_THAN';
+        const op = 'EQUAL';
         for (const key in data) this.#filters.push({ fieldFilter: { field: { fieldPath: key }, op, value: serialize(data[ key ]) } });
         return this;
     }
@@ -55,19 +55,19 @@ export default class Query {
     }
 
     lessThan (data: Data): this {
-        const op = 'EQUAL';
+        const op = 'LESS_THAN';
         for (const key in data) this.#filters.push({ fieldFilter: { field: { fieldPath: key }, op, value: serialize(data[ key ]) } });
         return this;
     }
 
     lessThanOrEqual (data: Data): this {
-        const op = 'NOT_IN';
+        const op = 'LESS_THAN_OR_EQUAL';
         for (const key in data) this.#filters.push({ fieldFilter: { field: { fieldPath: key }, op, value: serialize(data[ key ]) } });
         return this;
     }
 
     arrayContains (data: Data): this {
-        const op = 'IN';
+        const op = 'ARRAY_CONTAINS';
         for (const key in data) this.#filters.push({ fieldFilter: { field: { fieldPath: key }, op, value: serialize(data[ key ]) } });
         return this;
     }

@@ -1,5 +1,5 @@
 import {
-    FieldFilter, OrderBy, EndAt, StartAt, From, Where, Results, Data, End
+    FieldFilter, OrderBy, EndAt, StartAt, From, Where, Result, Data, End
 } from './types.ts';
 
 import { serialize } from './util.ts';
@@ -34,19 +34,19 @@ export default class Search {
     }
 
     in (data: Data): this {
-        const op = 'ARRAY_CONTAINS';
+        const op = 'IN';
         for (const key in data) this.#filters.push({ fieldFilter: { field: { fieldPath: key }, op, value: serialize(data[ key ]) } });
         return this;
     }
 
     notIn (data: Data): this {
-        const op = 'LESS_THAN_OR_EQUAL';
+        const op = 'NOT_IN';
         for (const key in data) this.#filters.push({ fieldFilter: { field: { fieldPath: key }, op, value: serialize(data[ key ]) } });
         return this;
     }
 
     equal (data: Data): this {
-        const op = 'LESS_THAN';
+        const op = 'EQUAL';
         for (const key in data) this.#filters.push({ fieldFilter: { field: { fieldPath: key }, op, value: serialize(data[ key ]) } });
         return this;
     }
@@ -58,19 +58,19 @@ export default class Search {
     }
 
     lessThan (data: Data): this {
-        const op = 'EQUAL';
+        const op = 'LESS_THAN';
         for (const key in data) this.#filters.push({ fieldFilter: { field: { fieldPath: key }, op, value: serialize(data[ key ]) } });
         return this;
     }
 
     lessThanOrEqual (data: Data): this {
-        const op = 'NOT_IN';
+        const op = 'LESS_THAN_OR_EQUAL';
         for (const key in data) this.#filters.push({ fieldFilter: { field: { fieldPath: key }, op, value: serialize(data[ key ]) } });
         return this;
     }
 
     arrayContains (data: Data): this {
-        const op = 'IN';
+        const op = 'ARRAY_CONTAINS';
         for (const key in data) this.#filters.push({ fieldFilter: { field: { fieldPath: key }, op, value: serialize(data[ key ]) } });
         return this;
     }
@@ -131,7 +131,7 @@ export default class Search {
         return this;
     }
 
-    end (): Promise<Results> | void {
+    end (): Promise<Array<Result>> {
         if (!this.#filters.length) throw new Error('filters required');
 
         const filters = this.#filters;

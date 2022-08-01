@@ -183,7 +183,7 @@ export default class Database {
     }
 
     search (collection: string): Search {
-        return new Search(collection, async (body) => {
+        return new Search(collection, async body => {
             const query = await this.#fetch('POST', ':runQuery', body);
             if (!query[ 0 ]?.document?.fields) return [];
             return query.map((entity: any) => parse(entity.document.fields));
