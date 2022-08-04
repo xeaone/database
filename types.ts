@@ -17,8 +17,12 @@ export type Key = {
     client_x509_cert_url?: string;
 };
 
+
+export type UnaryOperator =
+    'IS_NAN' | 'IS_NOT_NAN' |
+    'IS_NULL' | 'IS_NOT_NULL';
+
 export type Operator =
-    // IS_NAN IS_NULL IS_NOT_NAN IS_NOT_NULL
     'IN' | 'NOT_IN' |
     'EQUAL' | 'NOT_EQUAL' |
     'LESS_THAN' | 'LESS_THAN_OR_EQUAL' |
@@ -43,8 +47,9 @@ export type StartAt = { values: Value[]; before?: boolean; };
 export type EndAt = { values: Value[]; before?: boolean; };
 export type Order = { field: FieldReference; direction: Direction; };
 export type OrderBy = Order[];
+export type UnaryFilter = { unaryFilter: { op: UnaryOperator; field: FieldReference; }; };
 export type FieldFilter = { fieldFilter: { op: Operator; field: FieldReference, value: Value; }; };
-export type Where = { compositeFilter: { op: 'AND'; filters: Array<FieldFilter>; }; };
+export type Where = { compositeFilter: { op: 'AND'; filters: Array<FieldFilter | UnaryFilter>; }; };
 
 export type FieldTransform = {
     fieldPath: string;

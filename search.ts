@@ -1,5 +1,5 @@
 import {
-    FieldFilter, OrderBy, EndAt, StartAt, From, Where, Result, Data, End
+    FieldFilter, OrderBy, EndAt, StartAt, From, Where, Result, Data, End, UnaryFilter
 } from './types.ts';
 
 import { serialize } from './util.ts';
@@ -13,7 +13,7 @@ export default class Search {
     #orderBy: OrderBy = [];
     #endAt: EndAt = { values: [] };
     #startAt: StartAt = { values: [] };
-    #filters: Array<FieldFilter> = [];
+    #filters: Array<FieldFilter | UnaryFilter> = [];
 
     constructor (collection: string, end: End) {
         this.#end = end;
@@ -104,6 +104,30 @@ export default class Search {
     // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.offset
     offset (offset: number): this {
         this.#offset = offset;
+        return this;
+    }
+
+    isNan (...keys: Array<string>): this {
+        const op = 'IS_NAN';
+        for (const key of keys) this.#filters.push({ unaryFilter: { field: { fieldPath: key }, op } });
+        return this;
+    }
+
+    isNotNan (...keys: Array<string>): this {
+        const op = 'IS_NOT_NAN';
+        for (const key of keys) this.#filters.push({ unaryFilter: { field: { fieldPath: key }, op } });
+        return this;
+    }
+
+    isNull (...keys: Array<string>): this {
+        const op = 'IS_NULL';
+        for (const key of keys) this.#filters.push({ unaryFilter: { field: { fieldPath: key }, op } });
+        return this;
+    }
+
+    isNotNull (...keys: Array<string>): this {
+        const op = 'IS_NOT_NULL';
+        for (const key of keys) this.#filters.push({ unaryFilter: { field: { fieldPath: key }, op } });
         return this;
     }
 
