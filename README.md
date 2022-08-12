@@ -6,7 +6,7 @@ A Deno Firestore database client. Coming Soon.
 
 ## Example
 ```ts
-import Database from 'https://deno.land/x/xdatabase/mod.ts';
+import Database from 'https://deno.land/x/xdatabase/src/mod.ts';
 
 const project = Deno.env.get('FIRESTORE_PROJECT') ?? '';
 const key = JSON.parse(Deno.env.get('FIRESTORE_KEY') ?? '');
