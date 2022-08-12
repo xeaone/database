@@ -5,7 +5,10 @@
   "main": "src/mod.ts",
   "module": "src/mod.ts",
   "scripts": {
-    "test": "deno run -A test.ts"
+    "test": "deno run -A test.ts",
+    "major": "deno run -A deploy.ts major",
+    "minor": "deno run -A deploy.ts minor",
+    "patch": "deno run -A deploy.ts patch"
   },
   "repository": {
     "type": "git",
