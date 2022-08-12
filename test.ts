@@ -1,4 +1,4 @@
-import Database from './mod.ts';
+import Database from './src/mod.ts';
 
 // # FIRESTORE_PROJECT="echos-344816" \
 // # FIRESTORE_KEY=`cat ../FirestoreKey.json` \
