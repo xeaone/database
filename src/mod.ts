@@ -52,15 +52,12 @@ export default class Database {
     async #fetch (method: Method, path: string, body?: any) {
         if (!this.#project) throw new Error('project required');
 
-        await this.#auth();
+        if (this.#key) await this.#auth();
 
+        const headers = this.#token ?  { 'Authorization': `Bearer ${this.#token}` } : undefined;
         const response = await fetch(
             `https://firestore.googleapis.com/v1/projects/${this.#project}/databases/(default)/documents${path}`,
-            {
-                method,
-                body: body ? JSON.stringify(body) : undefined,
-                headers: { 'Authorization': `Bearer ${this.#token}` }
-            }
+            { method, headers, body: body ? JSON.stringify(body) : undefined }
         );
 
         const result = await response.json();
@@ -72,11 +69,13 @@ export default class Database {
     }
 
     key (data: Key): this {
+        if (!data || typeof data !== 'object') throw new Error('key type not valid');
         this.#key = data;
         return this;
     }
 
     project (data: string): this {
+        if (!data || typeof data !== 'string') throw new Error('project type not valid');
         this.#project = data;
         return this;
     }
