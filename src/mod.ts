@@ -29,7 +29,6 @@ export default class Database {
             const aud = 'https://oauth2.googleapis.com/token';
             const scope = 'https://www.googleapis.com/auth/datastore';
             const assertion = await jwt({ typ: 'JWT', alg: 'RS256', }, { exp, iat, iss, aud, scope }, this.#key.private_key);
-
             response = await fetch('https://oauth2.googleapis.com/token', {
                 method: 'POST',
                 body: [
@@ -38,20 +37,11 @@ export default class Database {
                 ].join('&'),
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
             });
-
         } else {
             response = await fetch('http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token', {
                 method: 'GET',
                 headers: { 'Metadata-Flavor':'Google' }
             });
-
-            if (!this.#project) {
-                this.#project = await fetch('http://metadata.google.internal/computeMetadata/v1/project/project-id', {
-                    method: 'GET',
-                    headers: { 'Metadata-Flavor':'Google' }
-                }).then(response => response.text());
-            }
-
         }
 
         const result = await response.json();
@@ -65,6 +55,15 @@ export default class Database {
     }
 
     async #fetch (method: Method, path: string, body?: any) {
+
+        if (!this.#project) {
+            const projectResponse = await fetch('http://metadata.google.internal/computeMetadata/v1/project/project-id', {
+                method: 'GET',
+                headers: { 'Metadata-Flavor':'Google' }
+            });
+            this.#project = await projectResponse.text();
+        }
+
         if (!this.#project) throw new Error('project required');
 
         await this.#auth();
