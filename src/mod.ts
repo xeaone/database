@@ -41,9 +41,13 @@ export default class Database {
             });
         } else {
             response = await fetch('http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token', {
-                method: 'POST',
+                method: 'GET',
                 headers: { 'Metadata-Flavor':'Google' }
             });
+// response = await fetch('http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token', {
+//                 method: 'POST',
+//                 headers: { 'Metadata-Flavor':'Google' }
+//             });
         }
 
         const result = await response.json();
