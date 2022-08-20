@@ -2,14 +2,17 @@
 [![Language grade: JavaScript](https://img.shields.io/lgtm/grade/javascript/g/xeaone/database.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/xeaone/database/context:javascript)
 
 # X-Database
-A Deno Firestore database client. Coming Soon.
+
+A Deno Firestore database client Coming Soon. Auto auth and project in Google
+Cloud.
 
 ## Example
-```ts
-import Database from 'https://deno.land/x/xdatabase/src/mod.ts';
 
-const project = Deno.env.get('FIRESTORE_PROJECT') ?? '';
-const key = JSON.parse(Deno.env.get('FIRESTORE_KEY') ?? '');
+```ts
+import Database from "https://deno.land/x/xdatabase/src/mod.ts";
+
+const project = Deno.env.get("FIRESTORE_PROJECT") ?? "";
+const key = JSON.parse(Deno.env.get("FIRESTORE_KEY") ?? "");
 
 const database = new Database();
 
@@ -18,21 +21,21 @@ database.project(project);
 
 const id = crypto.randomUUID();
 
-const user = await database.create('user', {
-    id,
-    age: 20,
-    phone: null,
-    active: true,
-    lastName: 'bar',
-    firstName: 'foo',
+const user = await database.create("user", {
+  id,
+  age: 20,
+  phone: null,
+  active: true,
+  lastName: "bar",
+  firstName: "foo",
 }).identifier(id).end();
 
 console.log(user);
 
 const users = await database
-    .search('user')
-    .equal({ firstName: 'foo' })
-    .limit(10).end();
+  .search("user")
+  .equal({ firstName: "foo" })
+  .limit(10).end();
 
 console.log(user);
 ```
@@ -40,42 +43,58 @@ console.log(user);
 ## API
 
 ### `project(project: string): this`
+
 Firestore project name.
 
 ### `key(key: string): this`
+
 Firestore service key.
 
 ### `search(collection: string)`
+
 ```ts
-const users = await database.search('user').equal({ id: '1' }).end();
+const users = await database.search("user").equal({ id: "1" }).end();
 ```
 
 ### `view(collection: string)`
+
 ```ts
-const user = await database.view('user').equal({ id: '1' }).end();
+const user = await database.view("user").equal({ id: "1" }).end();
 ```
 
 ### `remove(collection: string)`
+
 ```ts
-const user = await database.remove('user').identifier('1').end();
+const user = await database.remove("user").identifier("1").end();
 ```
 
 ### `create(collection: string, data: Data)`
+
 ```ts
-const user = await database.create('user', { id: '1', name: 'foo bar', age: 42 }).identifier('1').end();
+const user = await database.create("user", {
+  id: "1",
+  name: "foo bar",
+  age: 42,
+}).identifier("1").end();
 ```
 
 ### `update(collection: string, data: Data)`
+
 ```ts
-const user = await database.update('user', { age: 69 }).equal({ id: '1' }).end();
+const user = await database.update("user", { age: 69 }).equal({ id: "1" })
+  .end();
 ```
 
 ### `commit(collection: string, data: Data)`
+
 ```ts
-const user = await database.commit('user').equal({ id: '1' }).increment({ age: 1 }).end();
+const user = await database.commit("user").equal({ id: "1" }).increment({
+  age: 1,
+}).end();
 ```
 
 ### `Options`
+
 ```ts
 // All Except Search:
 identifier(string)
@@ -141,6 +160,7 @@ increment(Array<string>)
 // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/Write#FieldTransform.FIELDS.append_missing_elements
 append(Array<string>)
 ```
+
 <!--
 Firestore reset api docs
 https://firebase.google.com/docs/firestore/reference/rest/v1/projects.databases.documents
