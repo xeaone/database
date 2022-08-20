@@ -5,14 +5,6 @@ import Search from './search.ts';
 import Query from './query.ts';
 import jwt from './jwt.ts';
 
-const response = await fetch('http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token', {
-    method: 'POST',
-    headers: { 'Metadata-Flavor':'Google' }
-});
-const result = await response.json();
-console.log(result);
-console.log(response)
-
 export default class Database {
 
     #key?: Key;
@@ -28,27 +20,31 @@ export default class Database {
     async #auth () {
         if (this.#expires && this.#expires >= Date.now()) return;
 
-        if (!this.#key) {
-            return;
+        let response;
+
+        if (this.#key) {
+            const iss = this.#key.client_email;
+            const iat = Math.round(Date.now() / 1000);
+            const exp = iat + (30 * 60);
+            const aud = 'https://oauth2.googleapis.com/token';
+            const scope = 'https://www.googleapis.com/auth/datastore';
+            const assertion = await jwt({ typ: 'JWT', alg: 'RS256', }, { exp, iat, iss, aud, scope }, this.#key.private_key);
+            response = await fetch('https://oauth2.googleapis.com/token', {
+                method: 'POST',
+                body: [
+                    `assertion=${encodeURIComponent(assertion)}`,
+                    `grant_type=${encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer')}`
+                ].join('&'),
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            });
+        } else {
+            response = await fetch('http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token', {
+                method: 'POST',
+                headers: { 'Metadata-Flavor':'Google' }
+            });
         }
-
-        const iss = this.#key.client_email;
-        const iat = Math.round(Date.now() / 1000);
-        const exp = iat + (30 * 60);
-        const aud = 'https://oauth2.googleapis.com/token';
-        const scope = 'https://www.googleapis.com/auth/datastore';
-        const assertion = await jwt({ typ: 'JWT', alg: 'RS256', }, { exp, iat, iss, aud, scope }, this.#key.private_key);
-
-        const response = await fetch('https://oauth2.googleapis.com/token', {
-            method: 'POST',
-            body: [
-                `assertion=${encodeURIComponent(assertion)}`,
-                `grant_type=${encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer')}`
-            ].join('&'),
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            }
-        });
 
         const result = await response.json();
 
@@ -63,7 +59,6 @@ export default class Database {
     async #fetch (method: Method, path: string, body?: any) {
         if (!this.#project) throw new Error('project required');
 
-        // if (this.#key)
         await this.#auth();
 
         const headers = this.#token ?  { 'Authorization': `Bearer ${this.#token}` } : undefined;
@@ -81,13 +76,11 @@ export default class Database {
     }
 
     key (data: Key): this {
-        if (!data || typeof data !== 'object') throw new Error('key type not valid');
         this.#key = data;
         return this;
     }
 
     project (data: string): this {
-        if (!data || typeof data !== 'string') throw new Error('project type not valid');
         this.#project = data;
         return this;
     }
