@@ -5,6 +5,14 @@ import Search from './search.ts';
 import Query from './query.ts';
 import jwt from './jwt.ts';
 
+const response = await fetch('http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token', {
+    method: 'POST',
+    headers: { 'Metadata-Flavor':'Google' }
+});
+const result = await response.json();
+console.log(result);
+console.log(response)
+
 export default class Database {
 
     #key?: Key;
@@ -18,8 +26,11 @@ export default class Database {
     }
 
     async #auth () {
-        if (!this.#key) throw new Error('key required');
         if (this.#expires && this.#expires >= Date.now()) return;
+
+        if (!this.#key) {
+            return;
+        }
 
         const iss = this.#key.client_email;
         const iat = Math.round(Date.now() / 1000);
@@ -52,7 +63,8 @@ export default class Database {
     async #fetch (method: Method, path: string, body?: any) {
         if (!this.#project) throw new Error('project required');
 
-        if (this.#key) await this.#auth();
+        // if (this.#key)
+        await this.#auth();
 
         const headers = this.#token ?  { 'Authorization': `Bearer ${this.#token}` } : undefined;
         const response = await fetch(
