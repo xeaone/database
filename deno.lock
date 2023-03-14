@@ -1,0 +1,6 @@
+{
+  "version": "2",
+  "remote": {
+    "https://deno.land/std@0.151.0/semver/mod.ts": "4a5195fa81b4aede8875a386550a1119f01fb58d74aea899b2cfb136c05a7310"
+  }
+}
