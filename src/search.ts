@@ -156,7 +156,8 @@ export default class Search {
     }
 
     end (): Promise<Array<Result>> {
-        if (!this.#filters.length) throw new Error('filters required');
+        // removed filters to allow getting max documents
+        // if (!this.#filters.length) throw new Error('filters required');
 
         const filters = this.#filters;
         const collectionId = this.#collection;

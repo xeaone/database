@@ -17,7 +17,6 @@ export type Key = {
     client_x509_cert_url?: string;
 };
 
-
 export type UnaryOperator =
     'IS_NAN' | 'IS_NOT_NAN' |
     'IS_NULL' | 'IS_NOT_NULL';
