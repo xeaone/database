@@ -1,4 +1,3 @@
-
 export type Options = {
     key?: Key;
     project?: string;
@@ -17,38 +16,26 @@ export type Key = {
     client_x509_cert_url?: string;
 };
 
-export type UnaryOperator =
-    'IS_NAN' | 'IS_NOT_NAN' |
-    'IS_NULL' | 'IS_NOT_NULL';
+export type UnaryOperator = 'IS_NAN' | 'IS_NOT_NAN' | 'IS_NULL' | 'IS_NOT_NULL';
 
-export type Operator =
-    'IN' | 'NOT_IN' |
-    'EQUAL' | 'NOT_EQUAL' |
-    'LESS_THAN' | 'LESS_THAN_OR_EQUAL' |
-    'ARRAY_CONTAINS' | 'ARRAY_CONTAINS_ANY' |
-    'GREATER_THAN' | 'GREATER_THAN_OR_EQUAL';
+export type Operator = 'IN' | 'NOT_IN' | 'EQUAL' | 'NOT_EQUAL' | 'LESS_THAN' | 'LESS_THAN_OR_EQUAL' | 'ARRAY_CONTAINS' | 'ARRAY_CONTAINS_ANY' | 'GREATER_THAN' | 'GREATER_THAN_OR_EQUAL';
 
 export type Direction = 'ASCENDING' | 'DESCENDING';
 
-export type ArrayValue = { values: Array<Value>; };
-export type LatLng = { latitude: number, longitude: number; };
-export type MapValue = { fields: { [ key: string ]: Value; }; };
-export type Value =
-    { nullValue: null; } | { booleanValue: boolean; } |
-    { integerValue: string; } | { doubleValue: number; } |
-    { timestampValue: string; } | { stringValue: string; } |
-    { bytesValue: string; } | { referenceValue: string; } |
-    { arrayValue: ArrayValue; } | { geoPointValue: LatLng; } | { mapValue: MapValue; };
+export type ArrayValue = { values: Array<Value> };
+export type LatLng = { latitude: number; longitude: number };
+export type MapValue = { fields: { [key: string]: Value } };
+export type Value = { nullValue: null } | { booleanValue: boolean } | { integerValue: string } | { doubleValue: number } | { timestampValue: string } | { stringValue: string } | { bytesValue: string } | { referenceValue: string } | { arrayValue: ArrayValue } | { geoPointValue: LatLng } | { mapValue: MapValue };
 
-export type From = { collectionId: string; }[];
-export type FieldReference = { fieldPath: string; };
-export type StartAt = { values: Value[]; before?: boolean; };
-export type EndAt = { values: Value[]; before?: boolean; };
-export type Order = { field: FieldReference; direction: Direction; };
+export type From = { collectionId: string }[];
+export type FieldReference = { fieldPath: string };
+export type StartAt = { values: Value[]; before?: boolean };
+export type EndAt = { values: Value[]; before?: boolean };
+export type Order = { field: FieldReference; direction: Direction };
 export type OrderBy = Order[];
-export type UnaryFilter = { unaryFilter: { op: UnaryOperator; field: FieldReference; }; };
-export type FieldFilter = { fieldFilter: { op: Operator; field: FieldReference, value: Value; }; };
-export type Where = { compositeFilter: { op: 'AND'; filters: Array<FieldFilter | UnaryFilter>; }; };
+export type UnaryFilter = { unaryFilter: { op: UnaryOperator; field: FieldReference } };
+export type FieldFilter = { fieldFilter: { op: Operator; field: FieldReference; value: Value } };
+export type Where = { compositeFilter: { op: 'AND'; filters: Array<FieldFilter | UnaryFilter> } };
 
 export type FieldTransform = {
     fieldPath: string;

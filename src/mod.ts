@@ -1,4 +1,4 @@
-import { Key, Data, Value, Options, Method } from './types.ts';
+import { Data, Key, Method, Options, Value } from './types.ts';
 import { parse, serialize } from './util.ts';
 import Commit from './commit.ts';
 import Search from './search.ts';
@@ -6,18 +6,17 @@ import Query from './query.ts';
 import jwt from './jwt.ts';
 
 export default class Database {
-
     #key?: Key;
     #token?: string;
     #expires?: number;
     #project?: string;
 
-    constructor (options?: Options) {
+    constructor(options?: Options) {
         this.#key = this.#key ?? options?.key;
         this.#project = this.#project ?? options?.project;
     }
 
-    async #auth () {
+    async #auth() {
         if (this.#expires && this.#expires >= Date.now()) return;
 
         let response;
@@ -28,19 +27,19 @@ export default class Database {
             const exp = iat + (30 * 60);
             const aud = 'https://oauth2.googleapis.com/token';
             const scope = 'https://www.googleapis.com/auth/datastore';
-            const assertion = await jwt({ typ: 'JWT', alg: 'RS256', }, { exp, iat, iss, aud, scope }, this.#key.private_key);
+            const assertion = await jwt({ typ: 'JWT', alg: 'RS256' }, { exp, iat, iss, aud, scope }, this.#key.private_key);
             response = await fetch('https://oauth2.googleapis.com/token', {
                 method: 'POST',
                 body: [
                     `assertion=${encodeURIComponent(assertion)}`,
-                    `grant_type=${encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer')}`
+                    `grant_type=${encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer')}`,
                 ].join('&'),
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             });
         } else {
             response = await fetch('http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token', {
                 method: 'GET',
-                headers: { 'Metadata-Flavor':'Google' }
+                headers: { 'Metadata-Flavor': 'Google' },
             });
         }
 
@@ -54,12 +53,11 @@ export default class Database {
         this.#expires = Date.now() + (result.expires_in * 1000);
     }
 
-    async #fetch (method: Method, path: string, body?: any) {
-
+    async #fetch(method: Method, path: string, body?: any) {
         if (!this.#project) {
             const projectResponse = await fetch('http://metadata.google.internal/computeMetadata/v1/project/project-id', {
                 method: 'GET',
-                headers: { 'Metadata-Flavor':'Google' }
+                headers: { 'Metadata-Flavor': 'Google' },
             });
             this.#project = await projectResponse.text();
         }
@@ -68,34 +66,38 @@ export default class Database {
 
         await this.#auth();
 
-        const headers = this.#token ?  { 'Authorization': `Bearer ${this.#token}` } : undefined;
+        // console.log(`https://firestore.googleapis.com/v1/projects/${this.#project}/databases/(default)/documents${path}`);
+        // console.log(body);
+
+        const headers = this.#token ? { 'Authorization': `Bearer ${this.#token}` } : undefined;
         const response = await fetch(
             `https://firestore.googleapis.com/v1/projects/${this.#project}/databases/(default)/documents${path}`,
-            { method, headers, body: body ? JSON.stringify(body) : undefined }
+            { method, headers, body: body ? JSON.stringify(body) : undefined },
         );
 
         const result = await response.json();
+        // console.log(result)
 
-        const error = result?.error ?? result?.[ 0 ]?.error;
+        const error = result?.error ?? result?.[0]?.error;
         if (error) throw new Error(JSON.stringify(error, null, '\t'));
 
         return result;
     }
 
-    key (data: Key): this {
+    key(data: Key): this {
         this.#key = data;
         return this;
     }
 
-    project (data: string): this {
+    project(data: string): this {
         this.#project = data;
         return this;
     }
 
-    view (collection: string): Query {
+    view(collection: string): Query {
         return new Query(collection, async (body) => {
             const query = await this.#fetch('POST', ':runQuery', body);
-            const document = query[ 0 ]?.document;
+            const document = query[0]?.document;
             const name = document?.name;
 
             if (!name) throw new Error('View - document not found');
@@ -110,15 +112,15 @@ export default class Database {
         });
     }
 
-    remove (collection: string): Query {
+    remove(collection: string): Query {
         return new Query(collection, async (body) => {
             const query = await this.#fetch('POST', ':runQuery', body);
-            const document = query[ 0 ]?.document;
+            const document = query[0]?.document;
             const name = document?.name;
 
             if (!name) throw new Error('Remove - document not found');
 
-            const identifier = name.split('/').slice(-1)[ 0 ];
+            const identifier = name.split('/').slice(-1)[0];
             await this.#fetch('DELETE', `/${collection}/${identifier}`);
 
             // if (!document.fields) return {};
@@ -128,14 +130,13 @@ export default class Database {
         });
     }
 
-    create (collection: string, data: Data): Query {
-
+    create(collection: string, data: Data): Query {
         let valid = false;
         const fields: Record<string, Value> = {};
         for (const key in data) {
-            const value = data[ key ];
+            const value = data[key];
             if (value === undefined) continue;
-            fields[ key ] = serialize(value);
+            fields[key] = serialize(value);
             valid = true;
         }
 
@@ -143,7 +144,7 @@ export default class Database {
 
         return new Query(collection, async (body) => {
             const query = await this.#fetch('POST', ':runQuery', body);
-            const document = query[ 0 ]?.document;
+            const document = query[0]?.document;
             const name = document?.name;
 
             if (name) throw new Error('Create - document is found');
@@ -158,29 +159,28 @@ export default class Database {
         });
     }
 
-    update (collection: string, data: Data): Query {
-
+    update(collection: string, data: Data): Query {
         let valid = false;
         let mask = 'currentDocument.exists=true';
         const fields: Record<string, Value> = {};
         for (const key in data) {
             valid = true;
             mask += `&updateMask.fieldPaths=${key}`;
-            const value = data[ key ];
+            const value = data[key];
             if (value === undefined) continue;
-            fields[ key ] = serialize(value);
+            fields[key] = serialize(value);
         }
 
         if (!valid) throw new Error('Update - data required');
 
         return new Query(collection, async (body) => {
             const query = await this.#fetch('POST', ':runQuery', body);
-            const document = query[ 0 ]?.document;
+            const document = query[0]?.document;
             const name = document?.name;
 
             if (!name) throw new Error('Update - document not found');
 
-            const identifier = name.split('/').slice(-1)[ 0 ];
+            const identifier = name.split('/').slice(-1)[0];
             const patch = await this.#fetch('PATCH', `/${collection}/${identifier}?${mask}`, { fields });
 
             if (!patch.fields) return {};
@@ -193,19 +193,33 @@ export default class Database {
         });
     }
 
-    search (collection: string): Search {
-        return new Search(collection, async body => {
-            const query = await this.#fetch('POST', ':runQuery', body);
-            if (!query[ 0 ]?.document?.fields) return [];
-            return query.map((entity: any) => parse(entity.document.fields));
+    search(collection: string): Search {
+        const collections = collection.split('/');
+        return new Search(collections.slice(-1)[0], async (body) => {
+            // const filters = body.structuredQuery.where.compositeFilter.filters.length;
+
+            const query = await this.#fetch(
+                'POST',
+                `${collections.length === 1 ? '' : '/' + collections.slice(0, -1).join('/')}:runQuery`,
+                body,
+            );
+
+            if (!query[0]?.document?.fields) return [];
+
+            return query.map((entity: any) => {
+                if (entity.document.fields) {
+                    return parse(entity.document.fields);
+                } else {
+                    return {};
+                }
+            });
         });
     }
 
-    commit (collection: string, data: Data): Commit {
+    commit(collection: string, data: Data): Commit {
         if (!this.#project) throw new Error('project required');
-        return new Commit(this.#project, collection, data, async body => {
+        return new Commit(this.#project, collection, data, async (body) => {
             await this.#fetch('POST', ':commit', body);
         });
     }
-
 }

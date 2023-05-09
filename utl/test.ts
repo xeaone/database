@@ -1,7 +1,4 @@
-import Database from './src/mod.ts';
-
-// # FIRESTORE_PROJECT="echos-344816" \
-// # FIRESTORE_KEY=`cat ../FirestoreKey.json` \
+import Database from '../src/mod.ts';
 
 const compare = function (a: any, b: any) {
     a = a ?? {};
@@ -13,9 +10,9 @@ const compare = function (a: any, b: any) {
     return ak === bk && av === bv;
 };
 
-const collection = 'users';
-const project = 'qapi-351917';
-const key = JSON.parse(Deno.readTextFileSync('/home/alex/.qapi-credentials/qapi-dev-key.json'));
+const collection = '';
+const project = '';
+const key = JSON.parse(Deno.readTextFileSync(''));
 
 const database = new Database();
 database.key(key);

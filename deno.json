@@ -1,5 +1,22 @@
 {
     "tasks": {
-        "test": "deno run -A test.ts"
+        "t": "deno run -A utl/test.ts"
+    },
+    "fmt": {
+        "include": [
+            "src",
+            "utl"
+        ],
+        "singleQuote": true,
+        "indentWidth": 4,
+        "lineWidth": 800,
+        "semiColons": true,
+        "useTabs": false
+    },
+    "lint": {
+        "include": [
+            "src",
+            "utl"
+        ]
     }
 }
