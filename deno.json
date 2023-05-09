@@ -1,6 +1,7 @@
 {
     "tasks": {
-        "t": "deno run -A utl/test.ts"
+        "t": "deno run -A utl/test.ts",
+        "d": "deno run -A utl/deploy.ts"
     },
     "fmt": {
         "include": [
