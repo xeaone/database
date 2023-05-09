@@ -66,9 +66,6 @@ export default class Database {
 
         await this.#auth();
 
-        // console.log(`https://firestore.googleapis.com/v1/projects/${this.#project}/databases/(default)/documents${path}`);
-        // console.log(body);
-
         const headers = this.#token ? { 'Authorization': `Bearer ${this.#token}` } : undefined;
         const response = await fetch(
             `https://firestore.googleapis.com/v1/projects/${this.#project}/databases/(default)/documents${path}`,
@@ -76,7 +73,6 @@ export default class Database {
         );
 
         const result = await response.json();
-        // console.log(result)
 
         const error = result?.error ?? result?.[0]?.error;
         if (error) throw new Error(JSON.stringify(error, null, '\t'));
