@@ -19,7 +19,7 @@ export default class Database {
     async #auth() {
         if (this.#expires && this.#expires >= Date.now()) return;
 
-        let result: any;
+        let result;
 
         if (this.#key) {
             const iss = this.#key.client_email;
@@ -38,7 +38,7 @@ export default class Database {
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             });
 
-            const result = await response.json();
+            result = await response.json();
             if (result.error) throw new Error(JSON.stringify(result.error, null, '\t'));
         } else {
             try {
@@ -47,9 +47,9 @@ export default class Database {
                     headers: { 'Metadata-Flavor': 'Google' },
                 });
 
-                const result = await response.json();
+                result = await response.json();
                 if (result.error) throw new Error(JSON.stringify(result.error, null, '\t'));
-            } catch (error) {
+            } catch {
                 const command = await new Deno.Command('gcloud', {
                     args: ['auth', 'print-access-token'],
                     stderr: 'inherit',
