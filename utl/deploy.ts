@@ -19,8 +19,8 @@ if (!n.success) throw new Error('npm auth');
 
 await writeTextFile('./package.json', JSON.stringify(pkg, null, '    '));
 
-await (new Deno.Command('git', { args: ['commit', '-a', '-m', pkg.version] })).spawn();
-await (new Deno.Command('git', { args: ['push'] })).spawn();
-await (new Deno.Command('git', { args: ['tag', pkg.version] })).spawn();
-await (new Deno.Command('git', { args: ['push', '--tag'] })).spawn();
-await (new Deno.Command('npm', { args: ['publish', '--access', 'public'] })).spawn();
+await new Deno.Command('git', { args: ['commit', '-a', '-m', pkg.version] }).spawn().output();
+await new Deno.Command('git', { args: ['push'] }).spawn().output();
+await new Deno.Command('git', { args: ['tag', pkg.version] }).spawn().output();
+await new Deno.Command('git', { args: ['push', '--tag'] }).spawn().output();
+await new Deno.Command('npm', { args: ['publish', '--access', 'public'] }).spawn().output();

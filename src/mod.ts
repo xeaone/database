@@ -19,7 +19,7 @@ export default class Database {
     async #auth() {
         if (this.#expires && this.#expires >= Date.now()) return;
 
-        let response;
+        let result: any;
 
         if (this.#key) {
             const iss = this.#key.client_email;
@@ -28,7 +28,8 @@ export default class Database {
             const aud = 'https://oauth2.googleapis.com/token';
             const scope = 'https://www.googleapis.com/auth/datastore';
             const assertion = await jwt({ typ: 'JWT', alg: 'RS256' }, { exp, iat, iss, aud, scope }, this.#key.private_key);
-            response = await fetch('https://oauth2.googleapis.com/token', {
+
+            const response = await fetch('https://oauth2.googleapis.com/token', {
                 method: 'POST',
                 body: [
                     `assertion=${encodeURIComponent(assertion)}`,
@@ -36,17 +37,29 @@ export default class Database {
                 ].join('&'),
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             });
+
+            const result = await response.json();
+            if (result.error) throw new Error(JSON.stringify(result.error, null, '\t'));
         } else {
-            response = await fetch('http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token', {
-                method: 'GET',
-                headers: { 'Metadata-Flavor': 'Google' },
-            });
-        }
+            try {
+                const response = await fetch('http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token', {
+                    method: 'GET',
+                    headers: { 'Metadata-Flavor': 'Google' },
+                });
 
-        const result = await response.json();
+                const result = await response.json();
+                if (result.error) throw new Error(JSON.stringify(result.error, null, '\t'));
+            } catch (error) {
+                const command = await new Deno.Command('gcloud', {
+                    args: ['auth', 'print-access-token'],
+                    stderr: 'inherit',
+                }).output();
 
-        if (result.error) {
-            throw new Error(JSON.stringify(result.error, null, '\t'));
+                result = {
+                    expires_in: 3600,
+                    access_token: new TextDecoder().decode(command.stdout),
+                };
+            }
         }
 
         this.#token = result.access_token;
