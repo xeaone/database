@@ -1,5 +1,6 @@
 [![deno module](https://shield.deno.dev/x/xdatabase)](https://deno.land/x/xdatabase)
 ![deno compatibility](https://shield.deno.dev/deno/^1.33.3)
+![GitHub](https://img.shields.io/github/license/xeaone/database)
 
 # X-Database
 
