@@ -3,8 +3,7 @@
 
 # X-Database
 
-A Deno Firestore database client Coming Soon. Auto auth and project in Google
-Cloud.
+A Deno database client for Google Cloud Firestore.
 
 ## Example
 
