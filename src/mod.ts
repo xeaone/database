@@ -3,6 +3,7 @@ import {
     ServiceAccountCredentials,
     ApplicationDefaultCredentials,
 } from './types.ts';
+
 import { parse, serialize } from './util.ts';
 import Commit from './commit.ts';
 import Search from './search.ts';
@@ -17,26 +18,21 @@ export default class Database {
     #serviceAccountCredentials?: ServiceAccountCredentials;
     #applicationDefaultCredentials?: ApplicationDefaultCredentials;
 
-    // https://cloud.google.com/compute/docs/access/create-enable-service-accounts-for-instances#applications
-
     constructor(options?: Options) {
-        this.#project = this.#project ?? options?.project;
-        this.#serviceAccountCredentials = this.#serviceAccountCredentials ?? options?.serviceAccountCredentials;
-        this.#applicationDefaultCredentials = this.#applicationDefaultCredentials ?? options?.applicationDefaultCredentials;
+        this.#project = options?.project;
+        this.#serviceAccountCredentials = options?.serviceAccountCredentials;
+        this.#applicationDefaultCredentials = options?.applicationDefaultCredentials;
     }
 
     async #auth() {
         if (this.#expires && this.#expires >= Date.now()) return;
 
         let response;
-
         if (this.#applicationDefaultCredentials) {
-
             response = await fetch('https://oauth2.googleapis.com/token', {
                 method: 'POST',
                 body: new URLSearchParams(this.#applicationDefaultCredentials)
             });
-
         } else if (this.#serviceAccountCredentials) {
             const { client_email, private_key } = this.#serviceAccountCredentials;
             const iss = client_email;
@@ -44,21 +40,14 @@ export default class Database {
             const exp = iat + (30 * 60);
             const aud = 'https://oauth2.googleapis.com/token';
             const scope = 'https://www.googleapis.com/auth/datastore';
-            const token = await jwt({ typ: 'JWT', alg: 'RS256' }, { exp, iat, iss, aud, scope }, private_key);
-            const grant = 'urn:ietf:params:oauth:grant-type:jwt-bearer';
-
+            const assertion = await jwt({ typ: 'JWT', alg: 'RS256' }, { exp, iat, iss, aud, scope }, private_key);
+            const grant_type = 'urn:ietf:params:oauth:grant-type:jwt-bearer';
             response = await fetch('https://oauth2.googleapis.com/token', {
                 method: 'POST',
-                // headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({
-                    assertion: encodeURIComponent(token),
-                    grant_type: encodeURIComponent(grant)
-                }),
+                body: new URLSearchParams({ assertion, grant_type }),
             });
-
         } else {
             try {
-                // https://cloud.google.com/compute/docs/metadata/default-metadata-values#vm_instance_metadata
                 response = await fetch('http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token', {
                     method: 'GET',
                     headers: { 'Metadata-Flavor': 'Google' },
