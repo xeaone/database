@@ -10,7 +10,6 @@ import Query from './query.ts';
 import jwt from './jwt.ts';
 
 export default class Database {
-    #credential?: string | ServiceAccountCredentials | ApplicationDefaultCredentials;
 
     #token?: string;
     #expires?: number;
@@ -78,13 +77,13 @@ export default class Database {
     }
 
     async #fetch(method: Method, path: string, body?: any) {
-        // if (!this.#project) {
-        //     const projectResponse = await fetch('http://metadata.google.internal/computeMetadata/v1/project/project-id', {
-        //         method: 'GET',
-        //         headers: { 'Metadata-Flavor': 'Google' },
-        //     });
-        //     this.#project = await projectResponse.text();
-        // }
+        if (!this.#project) {
+            const projectResponse = await fetch('http://metadata.google.internal/computeMetadata/v1/project/project-id', {
+                method: 'GET',
+                headers: { 'Metadata-Flavor': 'Google' },
+            });
+            this.#project = await projectResponse.text();
+        }
 
         if (!this.#project) throw new Error('project required');
 
@@ -103,35 +102,55 @@ export default class Database {
         return result;
     }
 
-    /**
-     * @description To use Application default credentials run the following command `gcloud auth application-default login`
-     * @param applicationDefault
-     */
-    applicationDefault(applicationDefaultCredentials?: ApplicationDefaultCredentials) {
-        if (applicationDefaultCredentials) {
-            this.#applicationDefaultCredentials = { ...applicationDefaultCredentials, grant_type: 'refresh_token' };
-        } else {
-            // const command = await new Deno.Command('gcloud', {
-            //     args: ['auth', 'application-default', 'print-access-token'],
-            //     stderr: 'inherit',
-            // }).output();
-            // result = {
-            //     expires_in: 3599,
-            //     access_token: new TextDecoder().decode(command.stdout),
-            // };
-
-            const home = Deno.env.get('HOME');
-            const file = Deno.readTextFileSync(`${home}/.config/gcloud/application_default_credentials.json`);
-            const data = JSON.parse(file);
-            this.#applicationDefaultCredentials = { ...data, grant_type: 'refresh_token' };
-        }
-
+    applicationDefault(applicationDefaultCredentials: ApplicationDefaultCredentials) {
+        this.#applicationDefaultCredentials = { ...applicationDefaultCredentials, grant_type: 'refresh_token' };
         return this;
     }
 
     serviceAccount(serviceAccountCredentials: ServiceAccountCredentials) {
         this.#serviceAccountCredentials = { ...serviceAccountCredentials };
         return this;
+    }
+
+    /**
+     * @description
+     *              Initialize application default credentials with `gcloud auth application-default login`.
+     *              This file should be created and will be used as the application credential:
+     *              - Windows: %APPDATA%\gcloud\application_default_credentials.json
+     *              - Linux/Mac: $HOME/.config/gcloud/application_default_credentials.json
+     * @param credential
+     */
+    credential(credential: 'meta' | 'application' | ApplicationDefaultCredentials | ServiceAccountCredentials) {
+        // const command = await new Deno.Command('gcloud', {
+        //     args: ['auth', 'application-default', 'print-access-token'],
+        //     stderr: 'inherit',
+        // }).output();
+        // result = {
+        //     expires_in: 3599,
+        //     access_token: new TextDecoder().decode(command.stdout),
+        // };
+
+        if (credential === 'meta') {
+            return;
+        } else if (credential === 'application') {
+            let file;
+
+            try {
+                const prefix = Deno.build.os === 'windows' ? Deno.env.get('APPDATA') : `${Deno.env.get('HOME')}/.config`;
+                file = Deno.readTextFileSync(`${prefix}/gcloud/application_default_credentials.json`);
+            } catch {
+                return;
+            }
+
+            const data = JSON.parse(file);
+            this.#applicationDefaultCredentials = { ...data, grant_type: 'refresh_token' };
+        } else if (credential.type === 'authorized_user') {
+            this.applicationDefault(credential as ApplicationDefaultCredentials);
+        } else if (credential.type === 'service_account') {
+            this.serviceAccount(credential as ServiceAccountCredentials);
+        } else {
+            throw new Error('credential option required');
+        }
     }
 
     project(data: string): this {

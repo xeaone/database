@@ -1,5 +1,5 @@
-[![Total alerts](https://img.shields.io/lgtm/alerts/g/xeaone/database.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/xeaone/database/alerts/)
-[![Language grade: JavaScript](https://img.shields.io/lgtm/grade/javascript/g/xeaone/database.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/xeaone/database/context:javascript)
+[![deno module](https://shield.deno.dev/x/xdatabase)](https://deno.land/x/xdatabase)
+![deno compatibility](https://shield.deno.dev/deno/^1.33.3)
 
 # X-Database
 
@@ -11,13 +11,10 @@ Cloud.
 ```ts
 import Database from "https://deno.land/x/xdatabase/src/mod.ts";
 
-const project = Deno.env.get("FIRESTORE_PROJECT") ?? "";
-const key = JSON.parse(Deno.env.get("FIRESTORE_KEY") ?? "");
-
 const database = new Database();
 
-database.key(key);
-database.project(project);
+database.credential('application');
+database.project('google-cloud-project-id');
 
 const id = crypto.randomUUID();
 
@@ -39,6 +36,18 @@ const users = await database
 
 console.log(user);
 ```
+
+## Auth
+It is recommended to use the `'application'` String option this will use the Application Default Credential and will fallback to trying to use the Google Cloud service instance account credentials.
+You can initialize the Application Default Credential using this command `gcloud auth application-default login`.
+Alternatively you can pass a ServiceAccountCredentials key Object, ApplicationDefaultCredentials key Object, or the `'meta'` String.
+The option to manually use `'meta'` is nice for production because the only deno permission you should need is network.
+
+- `'application'` Deno permissions read
+  - Windows: `%APPDATA%\gcloud\application_default_credentials.json`
+  - Linux/Mac: `$HOME/.config/gcloud/application_default_credentials.json`
+- `'meta'`
+  - `http://metadata.google.internal`
 
 ## API
 

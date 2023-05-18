@@ -6,20 +6,21 @@ export type Options = {
 
 // https://developers.google.com/identity/protocols/oauth2/service-account
 export type ServiceAccountCredentials = {
-    type?: string;
-    project_id?: string;
-    private_key_id?: string;
-    private_key: string;
-    client_email: string;
-    client_id?: string;
-    auth_uri?: string;
-    token_uri?: string;
-    auth_provider_x509_cert_url?: string;
-    client_x509_cert_url?: string;
+    type: 'service_account',
+    project_id: string,
+    private_key_id: string,
+    private_key: string,
+    client_email: string,
+    client_id: string,
+    auth_uri?: string,
+    token_uri?: string,
+    client_x509_cert_url?: string,
+    auth_provider_x509_cert_url?: string,
 };
 
 // https://developers.google.com/identity/protocols/oauth2/web-server#offline
 export type ApplicationDefaultCredentials = {
+    type: 'authorized_user',
     client_id: string,
     client_secret: string,
     grant_type: string,
