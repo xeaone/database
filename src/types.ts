@@ -1,9 +1,11 @@
 export type Options = {
-    key?: Key;
     project?: string;
+    serviceAccountCredentials?: ServiceAccountCredentials;
+    applicationDefaultCredentials?: ApplicationDefaultCredentials;
 };
 
-export type Key = {
+// https://developers.google.com/identity/protocols/oauth2/service-account
+export type ServiceAccountCredentials = {
     type?: string;
     project_id?: string;
     private_key_id?: string;
@@ -15,6 +17,14 @@ export type Key = {
     auth_provider_x509_cert_url?: string;
     client_x509_cert_url?: string;
 };
+
+// https://developers.google.com/identity/protocols/oauth2/web-server#offline
+export type ApplicationDefaultCredentials = {
+    client_id: string,
+    client_secret: string,
+    grant_type: string,
+    refresh_token: string,
+}
 
 export type UnaryOperator = 'IS_NAN' | 'IS_NOT_NAN' | 'IS_NULL' | 'IS_NOT_NULL';
 

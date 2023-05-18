@@ -1,4 +1,8 @@
-import { Data, Key, Method, Options, Value } from './types.ts';
+import {
+    Data, Method, Options, Value,
+    ServiceAccountCredentials,
+    ApplicationDefaultCredentials,
+} from './types.ts';
 import { parse, serialize } from './util.ts';
 import Commit from './commit.ts';
 import Search from './search.ts';
@@ -6,74 +10,81 @@ import Query from './query.ts';
 import jwt from './jwt.ts';
 
 export default class Database {
-    #key?: Key;
+    #credential?: string | ServiceAccountCredentials | ApplicationDefaultCredentials;
+
     #token?: string;
     #expires?: number;
     #project?: string;
+    #serviceAccountCredentials?: ServiceAccountCredentials;
+    #applicationDefaultCredentials?: ApplicationDefaultCredentials;
+
+    // https://cloud.google.com/compute/docs/access/create-enable-service-accounts-for-instances#applications
 
     constructor(options?: Options) {
-        this.#key = this.#key ?? options?.key;
         this.#project = this.#project ?? options?.project;
+        this.#serviceAccountCredentials = this.#serviceAccountCredentials ?? options?.serviceAccountCredentials;
+        this.#applicationDefaultCredentials = this.#applicationDefaultCredentials ?? options?.applicationDefaultCredentials;
     }
 
     async #auth() {
         if (this.#expires && this.#expires >= Date.now()) return;
 
-        let result;
+        let response;
 
-        if (this.#key) {
-            const iss = this.#key.client_email;
+        if (this.#applicationDefaultCredentials) {
+
+            response = await fetch('https://oauth2.googleapis.com/token', {
+                method: 'POST',
+                body: new URLSearchParams(this.#applicationDefaultCredentials)
+            });
+
+        } else if (this.#serviceAccountCredentials) {
+            const { client_email, private_key } = this.#serviceAccountCredentials;
+            const iss = client_email;
             const iat = Math.round(Date.now() / 1000);
             const exp = iat + (30 * 60);
             const aud = 'https://oauth2.googleapis.com/token';
             const scope = 'https://www.googleapis.com/auth/datastore';
-            const assertion = await jwt({ typ: 'JWT', alg: 'RS256' }, { exp, iat, iss, aud, scope }, this.#key.private_key);
+            const token = await jwt({ typ: 'JWT', alg: 'RS256' }, { exp, iat, iss, aud, scope }, private_key);
+            const grant = 'urn:ietf:params:oauth:grant-type:jwt-bearer';
 
-            const response = await fetch('https://oauth2.googleapis.com/token', {
+            response = await fetch('https://oauth2.googleapis.com/token', {
                 method: 'POST',
-                body: [
-                    `assertion=${encodeURIComponent(assertion)}`,
-                    `grant_type=${encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer')}`,
-                ].join('&'),
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                // headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                    assertion: encodeURIComponent(token),
+                    grant_type: encodeURIComponent(grant)
+                }),
             });
 
-            result = await response.json();
-            if (result.error) throw new Error(JSON.stringify(result.error, null, '\t'));
         } else {
             try {
-                const response = await fetch('http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token', {
+                // https://cloud.google.com/compute/docs/metadata/default-metadata-values#vm_instance_metadata
+                response = await fetch('http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token', {
                     method: 'GET',
                     headers: { 'Metadata-Flavor': 'Google' },
                 });
-
-                result = await response.json();
-                if (result.error) throw new Error(JSON.stringify(result.error, null, '\t'));
             } catch {
-                const command = await new Deno.Command('gcloud', {
-                    args: ['auth', 'print-access-token'],
-                    stderr: 'inherit',
-                }).output();
-
-                result = {
-                    expires_in: 3600,
-                    access_token: new TextDecoder().decode(command.stdout),
-                };
+                throw new Error('credentials required');
             }
         }
+
+        const result = await response.json();
+        const error = result?.error ?? result?.[0]?.error;
+        if (error) throw new Error(JSON.stringify(result.error, null, '\t'));
 
         this.#token = result.access_token;
         this.#expires = Date.now() + (result.expires_in * 1000);
     }
 
     async #fetch(method: Method, path: string, body?: any) {
-        if (!this.#project) {
-            const projectResponse = await fetch('http://metadata.google.internal/computeMetadata/v1/project/project-id', {
-                method: 'GET',
-                headers: { 'Metadata-Flavor': 'Google' },
-            });
-            this.#project = await projectResponse.text();
-        }
+        // if (!this.#project) {
+        //     const projectResponse = await fetch('http://metadata.google.internal/computeMetadata/v1/project/project-id', {
+        //         method: 'GET',
+        //         headers: { 'Metadata-Flavor': 'Google' },
+        //     });
+        //     this.#project = await projectResponse.text();
+        // }
 
         if (!this.#project) throw new Error('project required');
 
@@ -86,15 +97,40 @@ export default class Database {
         );
 
         const result = await response.json();
-
         const error = result?.error ?? result?.[0]?.error;
         if (error) throw new Error(JSON.stringify(error, null, '\t'));
 
         return result;
     }
 
-    key(data: Key): this {
-        this.#key = data;
+    /**
+     * @description To use Application default credentials run the following command `gcloud auth application-default login`
+     * @param applicationDefault
+     */
+    applicationDefault(applicationDefaultCredentials?: ApplicationDefaultCredentials) {
+        if (applicationDefaultCredentials) {
+            this.#applicationDefaultCredentials = { ...applicationDefaultCredentials, grant_type: 'refresh_token' };
+        } else {
+            // const command = await new Deno.Command('gcloud', {
+            //     args: ['auth', 'application-default', 'print-access-token'],
+            //     stderr: 'inherit',
+            // }).output();
+            // result = {
+            //     expires_in: 3599,
+            //     access_token: new TextDecoder().decode(command.stdout),
+            // };
+
+            const home = Deno.env.get('HOME');
+            const file = Deno.readTextFileSync(`${home}/.config/gcloud/application_default_credentials.json`);
+            const data = JSON.parse(file);
+            this.#applicationDefaultCredentials = { ...data, grant_type: 'refresh_token' };
+        }
+
+        return this;
+    }
+
+    serviceAccount(serviceAccountCredentials: ServiceAccountCredentials) {
+        this.#serviceAccountCredentials = { ...serviceAccountCredentials };
         return this;
     }
 
