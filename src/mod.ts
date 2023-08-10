@@ -4,7 +4,7 @@ import {
     ApplicationDefaultCredentials,
 } from './types.ts';
 
-import { parse, serialize } from './util.ts';
+import { REFERENCE, parse, serialize } from './util.ts';
 import Commit from './commit.ts';
 import Search from './search.ts';
 import Query from './query.ts';
@@ -14,12 +14,13 @@ export default class Database {
 
     #token?: string;
     #expires?: number;
-    #project?: string;
+
+    #project: string;
     #serviceAccountCredentials?: ServiceAccountCredentials;
     #applicationDefaultCredentials?: ApplicationDefaultCredentials;
 
     constructor(options?: Options) {
-        this.#project = options?.project;
+        this.#project = options?.project ?? '';
         this.#serviceAccountCredentials = options?.serviceAccountCredentials;
         this.#applicationDefaultCredentials = options?.applicationDefaultCredentials;
     }
@@ -148,7 +149,7 @@ export default class Database {
     }
 
     view(collection: string): Query {
-        return new Query(collection, async (body) => {
+        return new Query(this.#project, collection, async (body) => {
             const query = await this.#fetch('POST', ':runQuery', body);
             const document = query[0]?.document;
             const name = document?.name;
@@ -156,17 +157,21 @@ export default class Database {
             if (!name) throw new Error('View - document not found');
 
             if (!document.fields) return {};
-            return parse(document.fields);
+            const result = parse(document.fields);
+            result[REFERENCE] = document.name;
+            return result;
         }, async (identifier) => {
             const document = await this.#fetch('GET', `/${collection}/${identifier}`);
 
             if (!document.fields) return {};
-            return parse(document.fields);
+            const result = parse(document.fields);
+            result[REFERENCE] = document.name;
+            return result;
         });
     }
 
     remove(collection: string): Query {
-        return new Query(collection, async (body) => {
+        return new Query(this.#project, collection, async (body) => {
             const query = await this.#fetch('POST', ':runQuery', body);
             const document = query[0]?.document;
             const name = document?.name;
@@ -195,7 +200,7 @@ export default class Database {
 
         if (!valid) throw new Error('Create - data required');
 
-        return new Query(collection, async (body) => {
+        return new Query(this.#project, collection, async body => {
             const query = await this.#fetch('POST', ':runQuery', body);
             const document = query[0]?.document;
             const name = document?.name;
@@ -203,12 +208,18 @@ export default class Database {
             if (name) throw new Error('Create - document is found');
 
             const post = await this.#fetch('POST', `/${collection}`, { fields });
+
             if (!post.fields) return {};
-            return parse(post.fields);
+            const result = parse(post.fields);
+            result[REFERENCE] = post.name;
+            return result;
         }, async (identifier) => {
             const post = await this.#fetch('POST', `/${collection}?documentId=${identifier}`, { fields });
+
             if (!post.fields) return {};
-            return parse(post.fields);
+            const result = parse(post.fields);
+            result[REFERENCE] = post.name;
+            return result;
         });
     }
 
@@ -226,7 +237,7 @@ export default class Database {
 
         if (!valid) throw new Error('Update - data required');
 
-        return new Query(collection, async (body) => {
+        return new Query(this.#project, collection, async body => {
             const query = await this.#fetch('POST', ':runQuery', body);
             const document = query[0]?.document;
             const name = document?.name;
@@ -237,18 +248,22 @@ export default class Database {
             const patch = await this.#fetch('PATCH', `/${collection}/${identifier}?${mask}`, { fields });
 
             if (!patch.fields) return {};
-            return parse(patch.fields);
+            const result = parse(patch.fields);
+            result[REFERENCE] = patch.name;
+            return result;
         }, async (identifier) => {
             const patch = await this.#fetch('PATCH', `/${collection}/${identifier}?${mask}`, { fields });
 
             if (!patch.fields) return {};
-            return parse(patch.fields);
+            const result = parse(patch.fields);
+            result[REFERENCE] = patch.name;
+            return result;
         });
     }
 
     search(collection: string): Search {
         const collections = collection.split('/');
-        return new Search(collections.slice(-1)[0], async (body) => {
+        return new Search(this.#project, collections.slice(-1)[0], async body => {
             // const filters = body.structuredQuery.where.compositeFilter.filters.length;
 
             const query = await this.#fetch(
@@ -261,7 +276,9 @@ export default class Database {
 
             return query.map((entity: any) => {
                 if (entity.document.fields) {
-                    return parse(entity.document.fields);
+                    const result = parse(entity.document.fields);
+                    result[REFERENCE] = entity.document.name;
+                    return result;
                 } else {
                     return {};
                 }
@@ -271,7 +288,7 @@ export default class Database {
 
     commit(collection: string, data: Data): Commit {
         if (!this.#project) throw new Error('project required');
-        return new Commit(this.#project, collection, data, async (body) => {
+        return new Commit(this.#project, collection, data, async body => {
             await this.#fetch('POST', ':commit', body);
         });
     }

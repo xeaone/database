@@ -1,15 +1,21 @@
-import { Data, End, FieldFilter, From, Result, Where } from './types.ts';
+import { Data, End, EndAt, FieldFilter, From, Result, StartAt, Where } from './types.ts';
 import { serialize } from './util.ts';
 
 export default class Query {
     #endQuery: End;
     #endIdentifier: End;
-    #collection: string;
     #identifier?: string;
     #filters: Array<FieldFilter> = [];
 
-    constructor(collection: string, endQuery: End, endIdentifier: End) {
+    #project: string;
+    #collection: string;
+
+    #endAt: EndAt = { values: [], before: false };
+    #startAt: StartAt = { values: [], before: false };
+
+    constructor(project: string, collection: string, endQuery: End, endIdentifier: End) {
         this.#endQuery = endQuery;
+        this.#project = project;
         this.#collection = collection;
         this.#endIdentifier = endIdentifier;
     }

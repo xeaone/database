@@ -1,19 +1,21 @@
 import { Data, End, EndAt, FieldFilter, From, OrderBy, Result, StartAt, UnaryFilter, Where } from './types.ts';
 
-import { serialize } from './util.ts';
+import { REFERENCE, serialize } from './util.ts';
 
 export default class Search {
     #end: End;
     #limit?: number;
     #offset?: number;
+    #project: string;
     #collection: string;
     #orderBy: OrderBy = [];
-    #endAt: EndAt = { values: [] };
-    #startAt: StartAt = { values: [] };
+    #endAt: EndAt = { values: [], before: false };
+    #startAt: StartAt = { values: [], before: false };
     #filters: Array<FieldFilter | UnaryFilter> = [];
 
-    constructor(collection: string, end: End) {
+    constructor(project: string, collection: string, end: End) {
         this.#end = end;
+        this.#project = project;
         this.#collection = collection;
     }
 
@@ -130,25 +132,56 @@ export default class Search {
 
     ascending(...keys: Array<string>): this {
         const direction = 'ASCENDING';
+        if (!keys.length) keys.push('__name__');
         for (const key of keys) this.#orderBy.push({ field: { fieldPath: key }, direction });
         return this;
     }
 
     descending(...keys: Array<string>): this {
         const direction = 'DESCENDING';
+        if (!keys.length) keys.push('__name__');
         for (const key of keys) this.#orderBy.push({ field: { fieldPath: key }, direction });
         return this;
     }
 
-    // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.start_at
-    startAt(...records: Array<Data>): this {
-        for (const record of records) this.#startAt.values.push(serialize(record));
+    /**
+     * @link https://cloud.google.com/firestore/docs/reference/rest/v1/StructuredQuery#FIELDS.start_at
+     * @param {string|Record} A document id or a Result with a document name using REFERENCE Symbol.
+     * @returns {this}
+     */
+    startAt(data: string | Result): this {
+
+        if (!this.#orderBy.length) {
+            this.#orderBy.push({ field: { fieldPath: '__name__' }, direction: 'ASCENDING' });
+        }
+
+        if (typeof data === 'string') {
+            this.#startAt.values.push({ referenceValue: `projects/${this.#project}/databases/(default)/documents/${this.#collection}/${data}` });
+        } else if (typeof data === 'object') {
+            this.#startAt.values.push({ referenceValue: (data as any)[REFERENCE] });
+        }
+
         return this;
     }
 
-    // Firestore: https://firebase.google.com/docs/firestore/reference/rest/v1/StructuredQuery#FIELDS.end_at
-    endAt(...records: Array<Data>): this {
-        for (const record of records) this.#endAt.values.push(serialize(record));
+    /**
+     *
+     * @link https://cloud.google.com/firestore/docs/reference/rest/v1/StructuredQuery#FIELDS.end_at
+     * @param {string|Record} A document id or a Result with a document name using the REFERENCE Symbol.
+     * @returns {this}
+     */
+    endAt(data: string | Result): this {
+
+        if (!this.#orderBy.length) {
+            this.#orderBy.push({ field: { fieldPath: '__name__' }, direction: 'ASCENDING' });
+        }
+
+        if (typeof data === 'string') {
+            this.#endAt.values.push({ referenceValue: `projects/${this.#project}/databases/(default)/documents/${this.#collection}/${data}` });
+        } else if (typeof data === 'object') {
+            this.#endAt.values.push({ referenceValue: (data as any)[REFERENCE] });
+        }
+
         return this;
     }
 
@@ -156,9 +189,11 @@ export default class Search {
 
         const filters = this.#filters;
         const collectionId = this.#collection;
-        const orderBy = this.#orderBy.length ? this.#orderBy : undefined;
+
         const endAt = this.#endAt.values.length ? this.#endAt : undefined;
         const startAt = this.#startAt.values.length ? this.#startAt : undefined;
+
+        const orderBy = this.#orderBy.length ? this.#orderBy : undefined;
 
         const limit: number | undefined = this.#limit;
         const offset: number | undefined = this.#offset;
@@ -169,3 +204,6 @@ export default class Search {
         return this.#end(body);
     }
 }
+
+// const kv = await Deno.openKv();
+// kv.get()

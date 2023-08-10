@@ -1,3 +1,4 @@
+import { REFERENCE } from "./util.ts";
 
 // https://developers.google.com/identity/protocols/oauth2/service-account
 export type ServiceAccountCredentials = {
@@ -66,6 +67,14 @@ export type Action = 'set' | 'view' | 'search' | 'create' | 'update' | 'remove';
 
 export type End = (result: any) => any;
 
-// export type Results = Array<Record<string, any>>;
-export type Data = Record<string, any>;
-export type Result = Record<string, any>;
+// export type Data = Record<string | number | symbol, any>;
+// export type Result = Record<string | number | symbol, any>;
+
+export type Data = {
+    [key: string | number | symbol]: any,
+};
+
+export type Result = {
+    [REFERENCE]?: string,
+    [key: string | number | symbol]: any,
+};

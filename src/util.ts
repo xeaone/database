@@ -78,6 +78,8 @@ export const serialize = (value: any): Value => {
     throw new Error(`value not allowed ${value}`);
 };
 
+export const REFERENCE = Symbol('reference');
+
 // export const filters = (filters: Array<FieldFilter>, operator: Operator, key: string, value: any) => {
 //     filters.push({
 //         fieldFilter: {
