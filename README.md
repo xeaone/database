@@ -39,21 +39,25 @@ console.log(user);
 
 It is recommended to use the `'application'` String option this will use the Application Default Credential and will fallback to trying to use the Google Cloud service instance account credentials. You can initialize the Application Default Credential using this command `gcloud auth application-default login`. Alternatively you can pass a ServiceAccountCredentials key Object, ApplicationDefaultCredentials key Object, or the `'meta'` String. The option to manually use `'meta'` is nice for production because the only deno permission you should need is network.
 
+- `'meta'`
+  - `http://metadata.google.internal`
 - `'application'` Deno permissions read
   - Windows: `%APPDATA%\gcloud\application_default_credentials.json`
   - Linux/Mac: `$HOME/.config/gcloud/application_default_credentials.json`
-- `'meta'`
-  - `http://metadata.google.internal`
 
 ## API
 
+### `id(id: string): this`
+The database id default is `(default)`
+
 ### `project(project: string): this`
+The GCP project name.
 
-Firestore project name.
-
-### `key(key: string): this`
-
-Firestore service key.
+### `credential(credential: 'meta' | 'application' | ServiceAccountCredentials | ApplicationDefaultCredentials): this`
+- `meta`
+- `application`
+- `ServiceAccountCredentials`
+- `ApplicationDefaultCredentials`
 
 ### `search(collection: string)`
 

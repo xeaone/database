@@ -106,10 +106,9 @@ export default class Database {
 
     /**
      * @description
-     *              Initialize application default credentials with `gcloud auth application-default login`.
-     *              This file should be created and will be used as the application credential:
-     *              - Windows: %APPDATA%\gcloud\application_default_credentials.json
-     *              - Linux/Mac: $HOME/.config/gcloud/application_default_credentials.json
+     *      Initialize application default credentials with `gcloud auth application-default login`.
+     *          - Windows: %APPDATA%\gcloud\application_default_credentials.json
+     *          - Linux/Mac: $HOME/.config/gcloud/application_default_credentials.json
      * @param credential
      */
     credential(credential: 'meta' | 'application' | ApplicationDefaultCredentials | ServiceAccountCredentials) {
