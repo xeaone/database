@@ -1,17 +1,12 @@
-import {
-    Data, Method, Options, Value,
-    ServiceAccountCredentials,
-    ApplicationDefaultCredentials,
-} from './types.ts';
+import { ApplicationDefaultCredentials, Data, Method, Options, ServiceAccountCredentials, Value } from './types.ts';
 
-import { REFERENCE, parse, serialize } from './util.ts';
+import { parse, REFERENCE, serialize } from './util.ts';
 import Commit from './commit.ts';
 import Search from './search.ts';
 import Query from './query.ts';
 import jwt from './jwt.ts';
 
 export default class Database {
-
     #token?: string;
     #expires?: number;
 
@@ -33,7 +28,7 @@ export default class Database {
         if (this.#applicationDefaultCredentials) {
             response = await fetch('https://oauth2.googleapis.com/token', {
                 method: 'POST',
-                body: new URLSearchParams(this.#applicationDefaultCredentials)
+                body: new URLSearchParams(this.#applicationDefaultCredentials),
             });
         } else if (this.#serviceAccountCredentials) {
             const { client_email, private_key } = this.#serviceAccountCredentials;
@@ -206,7 +201,7 @@ export default class Database {
 
         if (!valid) throw new Error('Create - data required');
 
-        return new Query(this.#project, collection, async body => {
+        return new Query(this.#project, collection, async (body) => {
             const query = await this.#fetch('POST', ':runQuery', body);
             const document = query[0]?.document;
             const name = document?.name;
@@ -243,7 +238,7 @@ export default class Database {
 
         if (!valid) throw new Error('Update - data required');
 
-        return new Query(this.#project, collection, async body => {
+        return new Query(this.#project, collection, async (body) => {
             const query = await this.#fetch('POST', ':runQuery', body);
             const document = query[0]?.document;
             const name = document?.name;
@@ -269,7 +264,7 @@ export default class Database {
 
     search(collection: string): Search {
         const collections = collection.split('/');
-        return new Search(this.#id, this.#project, collections.slice(-1)[0], async body => {
+        return new Search(this.#id, this.#project, collections.slice(-1)[0], async (body) => {
             // const filters = body.structuredQuery.where.compositeFilter.filters.length;
 
             const query = await this.#fetch(
@@ -294,7 +289,7 @@ export default class Database {
 
     commit(collection: string, data: Data): Commit {
         if (!this.#project) throw new Error('project required');
-        return new Commit(this.#id, this.#project, collection, data, async body => {
+        return new Commit(this.#id, this.#project, collection, data, async (body) => {
             await this.#fetch('POST', ':commit', body);
         });
     }

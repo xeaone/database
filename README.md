@@ -1,6 +1,4 @@
-[![deno module](https://shield.deno.dev/x/xdatabase)](https://deno.land/x/xdatabase)
-![deno compatibility](https://shield.deno.dev/deno/^1.33.3)
-![GitHub](https://img.shields.io/github/license/xeaone/database)
+[![deno module](https://shield.deno.dev/x/xdatabase)](https://deno.land/x/xdatabase) ![deno compatibility](https://shield.deno.dev/deno/^1.33.3) ![GitHub](https://img.shields.io/github/license/xeaone/database)
 
 # X-Database
 
@@ -9,7 +7,7 @@ A Deno database client for Google Cloud Firestore.
 ## Example
 
 ```ts
-import Database from "https://deno.land/x/xdatabase/src/mod.ts";
+import Database from 'https://deno.land/x/xdatabase/src/mod.ts';
 
 const database = new Database();
 
@@ -18,30 +16,28 @@ database.project('google-cloud-project-id');
 
 const id = crypto.randomUUID();
 
-const user = await database.create("user", {
-  id,
-  age: 20,
-  phone: null,
-  active: true,
-  lastName: "bar",
-  firstName: "foo",
+const user = await database.create('user', {
+    id,
+    age: 20,
+    phone: null,
+    active: true,
+    lastName: 'bar',
+    firstName: 'foo',
 }).identifier(id).end();
 
 console.log(user);
 
 const users = await database
-  .search("user")
-  .equal({ firstName: "foo" })
-  .limit(10).end();
+    .search('user')
+    .equal({ firstName: 'foo' })
+    .limit(10).end();
 
 console.log(user);
 ```
 
 ## Auth
-It is recommended to use the `'application'` String option this will use the Application Default Credential and will fallback to trying to use the Google Cloud service instance account credentials.
-You can initialize the Application Default Credential using this command `gcloud auth application-default login`.
-Alternatively you can pass a ServiceAccountCredentials key Object, ApplicationDefaultCredentials key Object, or the `'meta'` String.
-The option to manually use `'meta'` is nice for production because the only deno permission you should need is network.
+
+It is recommended to use the `'application'` String option this will use the Application Default Credential and will fallback to trying to use the Google Cloud service instance account credentials. You can initialize the Application Default Credential using this command `gcloud auth application-default login`. Alternatively you can pass a ServiceAccountCredentials key Object, ApplicationDefaultCredentials key Object, or the `'meta'` String. The option to manually use `'meta'` is nice for production because the only deno permission you should need is network.
 
 - `'application'` Deno permissions read
   - Windows: `%APPDATA%\gcloud\application_default_credentials.json`
@@ -62,43 +58,43 @@ Firestore service key.
 ### `search(collection: string)`
 
 ```ts
-const users = await database.search("user").equal({ id: "1" }).end();
+const users = await database.search('user').equal({ id: '1' }).end();
 ```
 
 ### `view(collection: string)`
 
 ```ts
-const user = await database.view("user").equal({ id: "1" }).end();
+const user = await database.view('user').equal({ id: '1' }).end();
 ```
 
 ### `remove(collection: string)`
 
 ```ts
-const user = await database.remove("user").identifier("1").end();
+const user = await database.remove('user').identifier('1').end();
 ```
 
 ### `create(collection: string, data: Data)`
 
 ```ts
-const user = await database.create("user", {
-  id: "1",
-  name: "foo bar",
-  age: 42,
-}).identifier("1").end();
+const user = await database.create('user', {
+    id: '1',
+    name: 'foo bar',
+    age: 42,
+}).identifier('1').end();
 ```
 
 ### `update(collection: string, data: Data)`
 
 ```ts
-const user = await database.update("user", { age: 69 }).equal({ id: "1" })
-  .end();
+const user = await database.update('user', { age: 69 }).equal({ id: '1' })
+    .end();
 ```
 
 ### `commit(collection: string, data: Data)`
 
 ```ts
-const user = await database.commit("user").equal({ id: "1" }).increment({
-  age: 1,
+const user = await database.commit('user').equal({ id: '1' }).increment({
+    age: 1,
 }).end();
 ```
 

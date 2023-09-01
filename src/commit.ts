@@ -10,7 +10,7 @@ export default class Commit {
     #identifier?: string;
     #updateTransforms: Array<FieldTransform> = [];
 
-    constructor(id:string, project: string, collection: string, data: Data, end: End) {
+    constructor(id: string, project: string, collection: string, data: Data, end: End) {
         this.#end = end;
         this.#data = data;
         this.#id = id;

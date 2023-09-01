@@ -1,23 +1,22 @@
 {
     "tasks": {
-        "t": "deno run -A utl/test.ts",
-        "d": "deno run -A utl/deploy.ts"
+        "t": "deno run -A utl/test.ts"
+    },
+    "lint": {
+        "exclude": [
+            ".github",
+            ".vscode"
+        ]
     },
     "fmt": {
-        "include": [
-            "src",
-            "utl"
+        "exclude": [
+            ".github",
+            ".vscode"
         ],
         "singleQuote": true,
         "indentWidth": 4,
         "lineWidth": 800,
         "semiColons": true,
         "useTabs": false
-    },
-    "lint": {
-        "include": [
-            "src",
-            "utl"
-        ]
     }
 }

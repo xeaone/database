@@ -1,22 +1,20 @@
 import Database from '../src/mod.ts';
 
-const compare = function (a: any, b: any) {
-    a = a ?? {};
-    b = b ?? {};
-    const ak = Object.keys(a).sort().join(' ');
-    const bk = Object.keys(b).sort().join(' ');
-    const av = Object.values(a).sort().join(' ');
-    const bv = Object.values(b).sort().join(' ');
-    return ak === bk && av === bv;
-};
+// const compare = function (a: any, b: any) {
+//     a = a ?? {};
+//     b = b ?? {};
+//     const ak = Object.keys(a).sort().join(' ');
+//     const bk = Object.keys(b).sort().join(' ');
+//     const av = Object.values(a).sort().join(' ');
+//     const bv = Object.values(b).sort().join(' ');
+//     return ak === bk && av === bv;
+// };
 
-const collection = '';
-const project = '';
-const key = JSON.parse(Deno.readTextFileSync(''));
+// const collection = '';
 
 const database = new Database();
-database.key(key);
-database.project(project);
+database.project('');
+database.credential('application');
 
 // database.on('create', '*', '*', (data, options) => {
 //     options.where = { id: 'e', account: 'e' };

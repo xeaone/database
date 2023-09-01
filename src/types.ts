@@ -1,29 +1,29 @@
-import { REFERENCE } from "./util.ts";
+import { REFERENCE } from './util.ts';
 
 // https://developers.google.com/identity/protocols/oauth2/service-account
 export type ServiceAccountCredentials = {
-    type: 'service_account',
-    project_id: string,
-    private_key_id: string,
-    private_key: string,
-    client_email: string,
-    client_id: string,
-    auth_uri?: string,
-    token_uri?: string,
-    client_x509_cert_url?: string,
-    auth_provider_x509_cert_url?: string,
+    type: 'service_account';
+    project_id: string;
+    private_key_id: string;
+    private_key: string;
+    client_email: string;
+    client_id: string;
+    auth_uri?: string;
+    token_uri?: string;
+    client_x509_cert_url?: string;
+    auth_provider_x509_cert_url?: string;
 };
 
 // https://developers.google.com/identity/protocols/oauth2/web-server#offline
 export type ApplicationDefaultCredentials = {
-    type: 'authorized_user',
-    client_id: string,
-    client_secret: string,
-    grant_type: string,
-    refresh_token: string,
-}
+    type: 'authorized_user';
+    client_id: string;
+    client_secret: string;
+    grant_type: string;
+    refresh_token: string;
+};
 
-export type Credential = 'meta' | 'application' | ApplicationDefaultCredentials | ServiceAccountCredentials
+export type Credential = 'meta' | 'application' | ApplicationDefaultCredentials | ServiceAccountCredentials;
 
 export type Options = {
     project?: string;
@@ -71,10 +71,10 @@ export type End = (result: any) => any;
 // export type Result = Record<string | number | symbol, any>;
 
 export type Data = {
-    [key: string | number | symbol]: any,
+    [key: string | number | symbol]: any;
 };
 
 export type Result = {
-    [REFERENCE]?: string,
-    [key: string | number | symbol]: any,
+    [REFERENCE]?: string;
+    [key: string | number | symbol]: any;
 };

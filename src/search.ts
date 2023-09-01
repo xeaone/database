@@ -16,7 +16,7 @@ export default class Search {
     #startAt: StartAt = { values: [], before: false };
     #filters: Array<FieldFilter | UnaryFilter> = [];
 
-    constructor(id:string, project: string, collection: string, end: End) {
+    constructor(id: string, project: string, collection: string, end: End) {
         this.#end = end;
         this.#id = id;
         this.#project = project;
@@ -154,7 +154,6 @@ export default class Search {
      * @returns {this}
      */
     startAt(data: string | Result): this {
-
         if (!this.#orderBy.length) {
             this.#orderBy.push({ field: { fieldPath: '__name__' }, direction: 'ASCENDING' });
         }
@@ -169,13 +168,11 @@ export default class Search {
     }
 
     /**
-     *
      * @link https://cloud.google.com/firestore/docs/reference/rest/v1/StructuredQuery#FIELDS.end_at
      * @param {string|Record} A document id or a Result with a document name using the REFERENCE Symbol.
      * @returns {this}
      */
     endAt(data: string | Result): this {
-
         if (!this.#orderBy.length) {
             this.#orderBy.push({ field: { fieldPath: '__name__' }, direction: 'ASCENDING' });
         }
@@ -190,7 +187,6 @@ export default class Search {
     }
 
     end(): Promise<Array<Result>> {
-
         const filters = this.#filters;
         const collectionId = this.#collection;
 
