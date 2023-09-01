@@ -6,15 +6,19 @@ export default class Search {
     #end: End;
     #limit?: number;
     #offset?: number;
+
+    #id: string;
     #project: string;
     #collection: string;
+
     #orderBy: OrderBy = [];
     #endAt: EndAt = { values: [], before: false };
     #startAt: StartAt = { values: [], before: false };
     #filters: Array<FieldFilter | UnaryFilter> = [];
 
-    constructor(project: string, collection: string, end: End) {
+    constructor(id:string, project: string, collection: string, end: End) {
         this.#end = end;
+        this.#id = id;
         this.#project = project;
         this.#collection = collection;
     }
@@ -156,7 +160,7 @@ export default class Search {
         }
 
         if (typeof data === 'string') {
-            this.#startAt.values.push({ referenceValue: `projects/${this.#project}/databases/(default)/documents/${this.#collection}/${data}` });
+            this.#startAt.values.push({ referenceValue: `projects/${this.#project}/databases/${this.#id}/documents/${this.#collection}/${data}` });
         } else if (typeof data === 'object') {
             this.#startAt.values.push({ referenceValue: (data as any)[REFERENCE] });
         }
@@ -177,7 +181,7 @@ export default class Search {
         }
 
         if (typeof data === 'string') {
-            this.#endAt.values.push({ referenceValue: `projects/${this.#project}/databases/(default)/documents/${this.#collection}/${data}` });
+            this.#endAt.values.push({ referenceValue: `projects/${this.#project}/databases/${this.#id}/documents/${this.#collection}/${data}` });
         } else if (typeof data === 'object') {
             this.#endAt.values.push({ referenceValue: (data as any)[REFERENCE] });
         }

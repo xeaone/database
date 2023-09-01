@@ -4,14 +4,16 @@ import { serialize } from './util.ts';
 export default class Commit {
     #end: End;
     #data: Data;
+    #id: string;
     #project: string;
     #collection: string;
     #identifier?: string;
     #updateTransforms: Array<FieldTransform> = [];
 
-    constructor(project: string, collection: string, data: Data, end: End) {
+    constructor(id:string, project: string, collection: string, data: Data, end: End) {
         this.#end = end;
         this.#data = data;
+        this.#id = id;
         this.#project = project;
         this.#collection = collection;
     }
@@ -54,7 +56,7 @@ export default class Commit {
             fields[key] = serialize(value);
         }
 
-        const name = `projects/${this.#project}/databases/(default)/documents/${this.#collection}/${this.#identifier}`;
+        const name = `projects/${this.#project}/databases/${this.#id}/documents/${this.#collection}/${this.#identifier}`;
         const body = { writes: [{ updateTransforms: this.#updateTransforms, update: { fields, name }, updateMask: { fieldPaths } }] };
 
         return this.#end(body);

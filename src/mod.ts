@@ -15,6 +15,7 @@ export default class Database {
     #token?: string;
     #expires?: number;
 
+    #id = '(default)';
     #project: string;
     #serviceAccountCredentials?: ServiceAccountCredentials;
     #applicationDefaultCredentials?: ApplicationDefaultCredentials;
@@ -81,7 +82,7 @@ export default class Database {
 
         const headers = this.#token ? { 'Authorization': `Bearer ${this.#token}` } : undefined;
         const response = await fetch(
-            `https://firestore.googleapis.com/v1/projects/${this.#project}/databases/(default)/documents${path}`,
+            `https://firestore.googleapis.com/v1/projects/${this.#project}/databases/${this.#id}/documents${path}`,
             { method, headers, body: body ? JSON.stringify(body) : undefined },
         );
 
@@ -143,8 +144,13 @@ export default class Database {
         }
     }
 
-    project(data: string): this {
-        this.#project = data;
+    id(id: string): this {
+        this.#id = id;
+        return this;
+    }
+
+    project(project: string): this {
+        this.#project = project;
         return this;
     }
 
@@ -263,7 +269,7 @@ export default class Database {
 
     search(collection: string): Search {
         const collections = collection.split('/');
-        return new Search(this.#project, collections.slice(-1)[0], async body => {
+        return new Search(this.#id, this.#project, collections.slice(-1)[0], async body => {
             // const filters = body.structuredQuery.where.compositeFilter.filters.length;
 
             const query = await this.#fetch(
@@ -288,7 +294,7 @@ export default class Database {
 
     commit(collection: string, data: Data): Commit {
         if (!this.#project) throw new Error('project required');
-        return new Commit(this.#project, collection, data, async body => {
+        return new Commit(this.#id, this.#project, collection, data, async body => {
             await this.#fetch('POST', ':commit', body);
         });
     }
