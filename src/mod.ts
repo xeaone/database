@@ -145,11 +145,21 @@ export default class Database {
         }
     }
 
+    /**
+     * The database to use the default is `(default)`
+     * @param {string} id
+     * @returns {Database}
+     */
     id(id: string): this {
         this.#id = id;
         return this;
     }
 
+    /**
+     * The GCP project
+     * @param {string} project
+     * @returns {Database}
+     */
     project(project: string): this {
         this.#project = project;
         return this;
