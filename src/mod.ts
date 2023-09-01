@@ -75,7 +75,12 @@ export default class Database {
 
         await this.#auth();
 
-        const headers = this.#token ? { 'Authorization': `Bearer ${this.#token}` } : undefined;
+        const headers: Record<string, string> = {
+            'x-goog-request-params': `project_id=${this.#project}&database_id=${this.#id}`
+        };
+
+        if (this.#token) headers['Authorization'] = `Bearer ${this.#token}`;
+
         const response = await fetch(
             `https://firestore.googleapis.com/v1/projects/${this.#project}/databases/${this.#id}/documents${path}`,
             { method, headers, body: body ? JSON.stringify(body) : undefined },
@@ -83,6 +88,7 @@ export default class Database {
 
         const result = await response.json();
         const error = result?.error ?? result?.[0]?.error;
+        if (error) console.error(body);
         if (error) throw new Error(JSON.stringify(error, null, '\t'));
 
         return result;
