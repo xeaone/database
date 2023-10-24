@@ -76,22 +76,27 @@ export default class Database {
         await this.#auth();
 
         const headers: Record<string, string> = {
+            'accept': 'application/json',
+            'content-type': 'application/json',
             'x-goog-request-params': `project_id=${this.#project}&database_id=${this.#id}`
         };
 
-        if (this.#token) headers['Authorization'] = `Bearer ${this.#token}`;
+        if (this.#token) headers[ 'Authorization' ] = `Bearer ${this.#token}`;
 
         const response = await fetch(
             `https://firestore.googleapis.com/v1/projects/${this.#project}/databases/${this.#id}/documents${path}`,
-            { method, headers, body: body ? JSON.stringify(body) : undefined },
+            {
+                method,
+                headers,
+                body: body ? JSON.stringify(body) : undefined
+            },
         );
 
-        const result = await response.json();
-        const error = result?.error ?? result?.[0]?.error;
-        if (error) console.error(body);
-        if (error) throw new Error(JSON.stringify(error, null, '\t'));
+        if (response.status !== 200) {
+            throw new Error(`${response.status} ${response.statusText} \n${await response.text()}\n`);
+        }
 
-        return result;
+        return await response.json();
     }
 
     applicationDefault(applicationDefaultCredentials: ApplicationDefaultCredentials) {
