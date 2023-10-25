@@ -1,8 +1,5 @@
-// import * as base64url from 'https://deno.land/std@0.144.0/encoding/base64url.ts';
-// import * as base64 from 'https://deno.land/std@0.144.0/encoding/base64.ts';
-
-import * as base64url from 'https://deno.land/std@0.186.0/encoding/base64url.ts';
-import * as base64 from 'https://deno.land/std@0.186.0/encoding/base64.ts';
+import * as base64url from 'https://deno.land/std@0.204.0/encoding/base64url.ts';
+import * as base64 from 'https://deno.land/std@0.204.0/encoding/base64.ts';
 
 export type Header = {
     alg: 'RS256';
