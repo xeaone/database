@@ -48,12 +48,15 @@ It is recommended to use the `'application'` String option this will use the App
 ## API
 
 ### `id(id: string): this`
+
 The database id default is `(default)`
 
 ### `project(project: string): this`
+
 The GCP project name.
 
 ### `credential(credential: 'meta' | 'application' | ServiceAccountCredentials | ApplicationDefaultCredentials): this`
+
 - `meta`
 - `application`
 - `ServiceAccountCredentials`

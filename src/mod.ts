@@ -78,17 +78,17 @@ export default class Database {
         const headers: Record<string, string> = {
             'accept': 'application/json',
             'content-type': 'application/json',
-            'x-goog-request-params': `project_id=${this.#project}&database_id=${this.#id}`
+            'x-goog-request-params': `project_id=${this.#project}&database_id=${this.#id}`,
         };
 
-        if (this.#token) headers[ 'Authorization' ] = `Bearer ${this.#token}`;
+        if (this.#token) headers['Authorization'] = `Bearer ${this.#token}`;
 
         const response = await fetch(
             `https://firestore.googleapis.com/v1/projects/${this.#project}/databases/${this.#id}/documents${path}`,
             {
                 method,
                 headers,
-                body: body ? JSON.stringify(body) : undefined
+                body: body ? JSON.stringify(body) : undefined,
             },
         );
 
