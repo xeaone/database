@@ -1,22 +1,22 @@
 {
-    "name": "@xeaone/database",
-    "version": "3.3.3",
-    "description": "X-Database A Deno database client for Google Cloud Firestore.",
-    "main": "src/mod.ts",
-    "module": "src/mod.ts",
-    "scripts": {},
-    "repository": {
-        "type": "git",
-        "url": "git+https://github.com/xeaone/database.git"
-    },
-    "keywords": [
-        "database",
-        "firestore"
-    ],
-    "author": "Alexander Elias",
-    "license": "MIT",
-    "bugs": {
-        "url": "https://github.com/xeaone/database/issues"
-    },
-    "homepage": "https://github.com/xeaone/database#readme"
+	"name": "@xeaone/database",
+	"version": "3.3.4",
+	"description": "X-Database A Deno database client for Google Cloud Firestore.",
+	"main": "src/mod.ts",
+	"module": "src/mod.ts",
+	"scripts": {},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/xeaone/database.git"
+	},
+	"keywords": [
+		"database",
+		"firestore"
+	],
+	"author": "Alexander Elias",
+	"license": "MIT",
+	"bugs": {
+		"url": "https://github.com/xeaone/database/issues"
+	},
+	"homepage": "https://github.com/xeaone/database#readme"
 }
