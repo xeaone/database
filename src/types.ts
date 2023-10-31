@@ -65,7 +65,8 @@ export type On = (data: Data, collection: string) => void;
 export type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 export type Action = 'set' | 'view' | 'search' | 'create' | 'update' | 'remove';
 
-export type End = (result: any) => any;
+export type End = (result: any) => Promise<any>;
+// export type End = (result: any) => any;
 
 // export type Data = Record<string | number | symbol, any>;
 // export type Result = Record<string | number | symbol, any>;

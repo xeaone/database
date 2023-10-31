@@ -205,5 +205,3 @@ export default class Search {
     }
 }
 
-// const kv = await Deno.openKv();
-// kv.get()

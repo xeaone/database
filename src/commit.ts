@@ -44,7 +44,7 @@ export default class Commit {
         return this;
     }
 
-    end(): void {
+    end(): Promise<any> {
         if (!this.#identifier) throw new Error('identifier required');
 
         const fieldPaths: Array<string> = [];

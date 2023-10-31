@@ -54,9 +54,11 @@ export default class Database {
             }
         }
 
+        if (response.status !== 200) {
+            throw new Error(`${response.status} ${response.statusText} \n${await response.text()}\n`);
+        }
+
         const result = await response.json();
-        const error = result?.error ?? result?.[0]?.error;
-        if (error) throw new Error(JSON.stringify(result.error, null, '\t'));
 
         this.#token = result.access_token;
         this.#expires = Date.now() + (result.expires_in * 1000);
