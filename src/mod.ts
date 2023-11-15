@@ -58,11 +58,11 @@ export default class Database {
                     signal: AbortSignal.timeout(this.#timeout * attempts),
                     headers: { 'Metadata-Flavor': 'Google' },
                 });
-            } catch (e) {
-                if (e?.name !== 'TimeoutError') {
+            } catch (error) {
+                if (error?.name !== 'TimeoutError') {
                     throw new Error('credentials required');
                 } else {
-                    throw e;
+                    throw error;
                 }
             }
         }
@@ -78,7 +78,7 @@ export default class Database {
     }
 
     async #fetch (method: Method, path: string, body?: any, attempts?: number): Promise<any> {
-        attempts = attempts ?? 1;
+        attempts = attempts || 1;
         try {
 
             if (!this.#project) {
@@ -115,11 +115,11 @@ export default class Database {
 
             return response.json();
 
-        } catch (e) {
-            if (e?.name === 'TimeoutError' && attempts < this.#attempts) {
-                return this.#fetch(method, path, body, attempts++);
+        } catch (error) {
+            if (error?.name === 'TimeoutError' && attempts <= this.#attempts) {
+                return this.#fetch(method, path, body, attempts + 1);
             } else {
-                throw e;
+                throw error;
             }
         }
     }
@@ -132,22 +132,6 @@ export default class Database {
     serviceAccount(serviceAccountCredentials: ServiceAccountCredentials) {
         this.#serviceAccountCredentials = { ...serviceAccountCredentials };
         return this;
-    }
-
-    /**
-     * @description Sets the max request time. Defaults to 500ms.
-     * @param {Number} timeout The milliseconds for request a timeout.
-     */
-    timeout (timeout: number) {
-        this.#timeout = timeout;
-    }
-
-    /**
-     * @description Sets the max retry atttempts after request timeout. Defaults to 5.
-     * @param {Number} attempts The amount of attempts for timeout retries.
-     */
-    attempts (attempts: number) {
-        this.#attempts = attempts;
     }
 
     /**
@@ -188,6 +172,26 @@ export default class Database {
         } else {
             throw new Error('credential option required');
         }
+    }
+
+    /**
+     * @description Sets the max request time. Defaults to 500ms.
+     * @param {Number} timeout The milliseconds for request a timeout.
+     * @return {Database}
+     */
+    timeout (timeout: number): this {
+        this.#timeout = timeout;
+        return this;
+    }
+
+    /**
+     * @description Sets the max retry atttempts after request timeout. Defaults to 5.
+     * @param {Number} attempts The amount of attempts for timeout retries.
+     * @returns {Database}
+     */
+    attempts (attempts: number): this {
+        this.#attempts = attempts;
+        return this;
     }
 
     /**
