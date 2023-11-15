@@ -7,27 +7,34 @@ import Query from './query.ts';
 import jwt from './jwt.ts';
 
 export default class Database {
+
     #token?: string;
     #expires?: number;
-
-    #id = '(default)';
     #project: string;
+
+    #attempts = 5;
+    #timeout = 500;
+    #id = '(default)';
+
     #serviceAccountCredentials?: ServiceAccountCredentials;
     #applicationDefaultCredentials?: ApplicationDefaultCredentials;
 
-    constructor(options?: Options) {
+    constructor (options?: Options) {
         this.#project = options?.project ?? '';
+        this.#timeout = options?.timeout ?? this.#timeout;
+        this.#attempts = options?.attempts ?? this.#attempts;
         this.#serviceAccountCredentials = options?.serviceAccountCredentials;
         this.#applicationDefaultCredentials = options?.applicationDefaultCredentials;
     }
 
-    async #auth() {
+    async #auth(attempts:number) {
         if (this.#expires && this.#expires >= Date.now()) return;
 
         let response;
         if (this.#applicationDefaultCredentials) {
             response = await fetch('https://oauth2.googleapis.com/token', {
                 method: 'POST',
+                signal: AbortSignal.timeout(this.#timeout * attempts),
                 body: new URLSearchParams(this.#applicationDefaultCredentials),
             });
         } else if (this.#serviceAccountCredentials) {
@@ -41,16 +48,22 @@ export default class Database {
             const grant_type = 'urn:ietf:params:oauth:grant-type:jwt-bearer';
             response = await fetch('https://oauth2.googleapis.com/token', {
                 method: 'POST',
+                signal: AbortSignal.timeout(this.#timeout * attempts),
                 body: new URLSearchParams({ assertion, grant_type }),
             });
         } else {
             try {
                 response = await fetch('http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token', {
                     method: 'GET',
+                    signal: AbortSignal.timeout(this.#timeout * attempts),
                     headers: { 'Metadata-Flavor': 'Google' },
                 });
-            } catch {
-                throw new Error('credentials required');
+            } catch (e) {
+                if (e?.name !== 'TimeoutError') {
+                    throw new Error('credentials required');
+                } else {
+                    throw e;
+                }
             }
         }
 
@@ -64,41 +77,51 @@ export default class Database {
         this.#expires = Date.now() + (result.expires_in * 1000);
     }
 
-    async #fetch(method: Method, path: string, body?: any) {
-        if (!this.#project) {
-            const projectResponse = await fetch('http://metadata.google.internal/computeMetadata/v1/project/project-id', {
-                method: 'GET',
-                headers: { 'Metadata-Flavor': 'Google' },
-            });
-            this.#project = await projectResponse.text();
+    async #fetch (method: Method, path: string, body?: any, attempts?: number): Promise<any> {
+        attempts = attempts ?? 1;
+        try {
+
+            if (!this.#project) {
+                const projectResponse = await fetch('http://metadata.google.internal/computeMetadata/v1/project/project-id', {
+                    method: 'GET',
+                    signal: AbortSignal.timeout(this.#timeout * attempts),
+                    headers: { 'Metadata-Flavor': 'Google' },
+                });
+                this.#project = await projectResponse.text();
+            }
+
+            if (!this.#project) throw new Error('project required');
+
+            await this.#auth(attempts);
+
+            const response = await fetch(
+                `https://firestore.googleapis.com/v1/projects/${this.#project}/databases/${this.#id}/documents${path}`,
+                {
+                    method,
+                    body: body ? JSON.stringify(body) : undefined,
+                    signal: AbortSignal.timeout(this.#timeout * attempts),
+                    headers: {
+                        'accept': 'application/json',
+                        'content-type': 'application/json',
+                        'authorization': this.#token ? `Bearer ${this.#token}` : '',
+                        'x-goog-request-params': `project_id=${this.#project}&database_id=${this.#id}`,
+                    }
+                },
+            );
+
+            if (response.status !== 200) {
+                throw new Error(`${response.status} ${response.statusText} \n${await response.text()}\n`);
+            }
+
+            return response.json();
+
+        } catch (e) {
+            if (e?.name === 'TimeoutError' && attempts < this.#attempts) {
+                return this.#fetch(method, path, body, attempts++);
+            } else {
+                throw e;
+            }
         }
-
-        if (!this.#project) throw new Error('project required');
-
-        await this.#auth();
-
-        const headers: Record<string, string> = {
-            'accept': 'application/json',
-            'content-type': 'application/json',
-            'x-goog-request-params': `project_id=${this.#project}&database_id=${this.#id}`,
-        };
-
-        if (this.#token) headers['Authorization'] = `Bearer ${this.#token}`;
-
-        const response = await fetch(
-            `https://firestore.googleapis.com/v1/projects/${this.#project}/databases/${this.#id}/documents${path}`,
-            {
-                method,
-                headers,
-                body: body ? JSON.stringify(body) : undefined,
-            },
-        );
-
-        if (response.status !== 200) {
-            throw new Error(`${response.status} ${response.statusText} \n${await response.text()}\n`);
-        }
-
-        return await response.json();
     }
 
     applicationDefault(applicationDefaultCredentials: ApplicationDefaultCredentials) {
@@ -109,6 +132,22 @@ export default class Database {
     serviceAccount(serviceAccountCredentials: ServiceAccountCredentials) {
         this.#serviceAccountCredentials = { ...serviceAccountCredentials };
         return this;
+    }
+
+    /**
+     * @description Sets the max request time. Defaults to 500ms.
+     * @param {Number} timeout The milliseconds for request a timeout.
+     */
+    timeout (timeout: number) {
+        this.#timeout = timeout;
+    }
+
+    /**
+     * @description Sets the max retry atttempts after request timeout. Defaults to 5.
+     * @param {Number} attempts The amount of attempts for timeout retries.
+     */
+    attempts (attempts: number) {
+        this.#attempts = attempts;
     }
 
     /**
