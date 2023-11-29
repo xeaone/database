@@ -1,7 +1,9 @@
 {
     "tasks": {
-        "t": "deno run -A utl/test.ts",
-        "p": "publish [Method] --git --tag --npm"
+        "test": "deno run -A utl/test.ts",
+        "major": "publish major --git --tag --npm",
+        "minor": "publish minot --git --tag --npm",
+        "patch": "publish patch --git --tag --npm"
     },
     "lint": {
         "exclude": [

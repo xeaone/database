@@ -12,8 +12,8 @@ export default class Database {
     #expires?: number;
     #project: string;
 
-    #attempts = 5;
-    #timeout = 500;
+    #attempts = 10;
+    #timeout = 1000;
     #id = '(default)';
 
     #serviceAccountCredentials?: ServiceAccountCredentials;
@@ -55,8 +55,8 @@ export default class Database {
             try {
                 response = await fetch('http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token', {
                     method: 'GET',
-                    signal: AbortSignal.timeout(this.#timeout * attempts),
                     headers: { 'Metadata-Flavor': 'Google' },
+                    signal: AbortSignal.timeout(this.#timeout * attempts),
                 });
             } catch (error) {
                 if (error?.name !== 'TimeoutError') {
@@ -116,10 +116,10 @@ export default class Database {
             return response.json();
 
         } catch (error) {
-            if (error?.name === 'TimeoutError' && attempts <= this.#attempts) {
+            if (error?.name === 'TimeoutError' && attempts < this.#attempts) {
                 return this.#fetch(method, path, body, attempts + 1);
             } else {
-                throw error;
+                throw new Error(error?.message, { cause: error });
             }
         }
     }
