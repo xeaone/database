@@ -55,14 +55,14 @@ export default class Database {
             try {
                 response = await fetch('http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token', {
                     method: 'GET',
-                    headers: { 'Metadata-Flavor': 'Google' },
                     signal: AbortSignal.timeout(this.#timeout * attempts),
+                    headers: { 'Metadata-Flavor': 'Google', 'X-Google-Metadata-Request': 'True' },
                 });
             } catch (error) {
                 if (error?.name !== 'TimeoutError') {
                     throw new Error('credentials required');
                 } else {
-                    throw error;
+                    throw new Error(error?.message, { cause: error });
                 }
             }
         }
@@ -85,7 +85,7 @@ export default class Database {
                 const projectResponse = await fetch('http://metadata.google.internal/computeMetadata/v1/project/project-id', {
                     method: 'GET',
                     signal: AbortSignal.timeout(this.#timeout * attempts),
-                    headers: { 'Metadata-Flavor': 'Google' },
+                    headers: { 'Metadata-Flavor': 'Google', 'X-Google-Metadata-Request': 'True' },
                 });
                 this.#project = await projectResponse.text();
             }
