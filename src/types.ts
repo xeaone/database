@@ -65,7 +65,7 @@ export type FieldTransform = {
 };
 
 export type On = (data: Data, collection: string) => void;
-export type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+export type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE' | 'CONNECT';
 export type Action = 'set' | 'view' | 'search' | 'create' | 'update' | 'remove';
 
 export type End = (result: any) => Promise<any>;
