@@ -15,12 +15,14 @@ export default class Database {
     #attempts = 10;
     #timeout = 1000;
     #id = '(default)';
+    #base = new URL('https://firestore.googleapis.com/v1');
 
     #serviceAccountCredentials?: ServiceAccountCredentials;
     #applicationDefaultCredentials?: ApplicationDefaultCredentials;
 
     constructor (options?: Options) {
         this.#project = options?.project ?? '';
+        this.#base = options?.base ?? this.#base;
         this.#timeout = options?.timeout ?? this.#timeout;
         this.#attempts = options?.attempts ?? this.#attempts;
         this.#serviceAccountCredentials = options?.serviceAccountCredentials;
@@ -94,20 +96,25 @@ export default class Database {
 
             await this.#auth(attempts);
 
-            const response = await fetch(
-                `https://firestore.googleapis.com/v1/projects/${this.#project}/databases/${this.#id}/documents${path}`,
-                {
-                    method,
-                    body: body ? JSON.stringify(body) : undefined,
-                    signal: AbortSignal.timeout(this.#timeout * attempts),
-                    headers: {
-                        'accept': 'application/json',
-                        'content-type': 'application/json',
-                        'authorization': this.#token ? `Bearer ${this.#token}` : '',
-                        'x-goog-request-params': `project_id=${this.#project}&database_id=${this.#id}`,
-                    }
-                },
-            );
+            const signal =
+                method === 'PATCH' ||
+                method === 'DELETE' ||
+                (method === 'POST' && path !== ':runQuery') ?
+                    AbortSignal.timeout(this.#timeout * attempts) : undefined;
+
+            const url = new URL(`${this.#base}/projects/${this.#project}/databases/${this.#id}/documents${path}`);
+
+            const response = await fetch(url, {
+                method,
+                body: body ? JSON.stringify(body) : undefined,
+                signal,
+                headers: {
+                    'accept': 'application/json',
+                    'content-type': 'application/json',
+                    'authorization': this.#token ? `Bearer ${this.#token}` : '',
+                    'x-goog-request-params': `project_id=${this.#project}&database_id=${this.#id}`,
+                }
+            });
 
             if (response.status !== 200) {
                 throw new Error(`${response.status} ${response.statusText} \n${await response.text()}\n`);
@@ -195,7 +202,17 @@ export default class Database {
     }
 
     /**
-     * The database to use the default is `(default)`
+     * @description The base url to use to connect to the database deafult is https://firestore.googleapis.com/v1/
+     * @param {string}
+     * @return {Database}
+     */
+    base (base: string) {
+        this.#base = new URL(base.replace(/\/+$/, ''));
+        return this;
+    }
+
+    /**
+     * @description The database to use the default is `(default)`
      * @param {string} id
      * @returns {Database}
      */
@@ -205,7 +222,7 @@ export default class Database {
     }
 
     /**
-     * The GCP project
+     * @description The GCP project
      * @param {string} project
      * @returns {Database}
      */

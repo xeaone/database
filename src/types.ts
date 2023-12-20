@@ -26,6 +26,7 @@ export type ApplicationDefaultCredentials = {
 export type Credential = 'meta' | 'application' | ApplicationDefaultCredentials | ServiceAccountCredentials;
 
 export type Options = {
+    base?: URL,
     project?: string,
     timeout?: number,
     attempts?: number,

@@ -1,9 +1,10 @@
 {
     "tasks": {
-        "test": "deno run -A utl/test.ts",
+        "test": "deno test -A utl/test.ts",
         "major": "publish major --git --tag --npm",
         "minor": "publish minor --git --tag --npm",
-        "patch": "publish patch --git --tag --npm"
+        "patch": "publish patch --git --tag --npm",
+        "emulator": "gcloud emulators firestore start --host-port=127.0.0.1:9000 --project=test"
     },
     "lint": {
         "exclude": [
