@@ -1,4 +1,4 @@
-import { assert } from 'https://deno.land/std@0.209.0/assert/mod.ts';
+import { assert } from 'https://deno.land/std@0.213.0/assert/mod.ts';
 import { REFERENCE } from '../src/util.ts';
 import Database from '../src/mod.ts';
 
