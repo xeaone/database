@@ -7,7 +7,6 @@ import Query from './query.ts';
 import jwt from './jwt.ts';
 
 export default class Database {
-
     #token?: string;
     #expires?: number;
     #project: string;
@@ -20,7 +19,7 @@ export default class Database {
     #serviceAccountCredentials?: ServiceAccountCredentials;
     #applicationDefaultCredentials?: ApplicationDefaultCredentials;
 
-    constructor (options?: Options) {
+    constructor(options?: Options) {
         this.#project = options?.project ?? '';
         this.#base = options?.base ?? this.#base;
         this.#timeout = options?.timeout ?? this.#timeout;
@@ -32,15 +31,14 @@ export default class Database {
     async #auth(attempts: number): Promise<void> {
         if (this.#expires && this.#expires >= Date.now()) return;
 
-        let response;
+        let response: Response | undefined;
         if (this.#applicationDefaultCredentials) {
+            const signal = AbortSignal.timeout(this.#timeout * attempts);
+            const body = new URLSearchParams(this.#applicationDefaultCredentials);
             try {
-                response = await fetch('https://oauth2.googleapis.com/token', {
-                    method: 'POST',
-                    signal: AbortSignal.timeout(this.#timeout * attempts),
-                    body: new URLSearchParams(this.#applicationDefaultCredentials),
-                });
+                response = await fetch('https://oauth2.googleapis.com/token', { body, signal, method: 'POST' });
             } catch (error) {
+                await response?.body?.cancel();
                 if (error?.name === 'TimeoutError' && attempts < this.#attempts) {
                     return this.#auth(attempts + 1);
                 } else {
@@ -56,13 +54,12 @@ export default class Database {
             const scope = 'https://www.googleapis.com/auth/datastore';
             const assertion = await jwt({ typ: 'JWT', alg: 'RS256' }, { exp, iat, iss, aud, scope }, private_key);
             const grant_type = 'urn:ietf:params:oauth:grant-type:jwt-bearer';
+            const signal = AbortSignal.timeout(this.#timeout * attempts);
+            const body = new URLSearchParams({ assertion, grant_type });
             try {
-                response = await fetch('https://oauth2.googleapis.com/token', {
-                    method: 'POST',
-                    signal: AbortSignal.timeout(this.#timeout * attempts),
-                    body: new URLSearchParams({ assertion, grant_type }),
-                });
+                response = await fetch('https://oauth2.googleapis.com/token', { body, signal, method: 'POST' });
             } catch (error) {
+                await response?.body?.cancel();
                 if (error?.name === 'TimeoutError' && attempts < this.#attempts) {
                     return this.#auth(attempts + 1);
                 } else {
@@ -73,10 +70,11 @@ export default class Database {
             try {
                 response = await fetch('http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token', {
                     method: 'GET',
-                    signal: AbortSignal.timeout(5000),
+                    signal: AbortSignal.timeout(10_000),
                     headers: { 'Metadata-Flavor': 'Google', 'X-Google-Metadata-Request': 'True' },
                 });
             } catch {
+                await response?.body?.cancel();
                 throw new Error('credentials required');
             }
         }
@@ -91,46 +89,60 @@ export default class Database {
         this.#expires = Date.now() + (result.expires_in * 1000);
     }
 
-    async #fetch (method: Method, path: string, body?: any, attempts?: number): Promise<any> {
+    async #fetch(method: Method, path: string, data?: any, attempts?: number): Promise<any> {
         attempts = attempts || 1;
 
         if (!this.#project) {
+            let response: Response | undefined;
+
             try {
-                this.#project = await (await fetch('http://metadata.google.internal/computeMetadata/v1/project/project-id', {
+                response = await fetch('http://metadata.google.internal/computeMetadata/v1/project/project-id', {
                     method: 'GET',
-                    signal: AbortSignal.timeout(5000),
+                    signal: AbortSignal.timeout(10_000),
                     headers: { 'Metadata-Flavor': 'Google', 'X-Google-Metadata-Request': 'True' },
-                })).text();
+                });
             } catch {
+                await response?.body?.cancel();
                 throw new Error('project required');
             }
+
+            if (response.status !== 200) {
+                throw new Error(`${response.status} ${response.statusText} \n${await response.text()}\n`);
+            }
+
+            this.#project = await response.text();
         }
 
         await this.#auth(attempts);
 
-        const idempotent =
-            path.endsWith(':runQuery') ||
-            method !== 'CONNECT' &&
-            method !== 'PATCH' &&
-            method !== 'POST' ?
-                true : false;
+        const idempotent = path.endsWith(':runQuery') ||
+                method !== 'CONNECT' &&
+                    method !== 'PATCH' &&
+                    method !== 'POST'
+            ? true
+            : false;
 
         const url = new URL(`${this.#base}/projects/${this.#project}/databases/${this.#id}/documents${path}`);
+        const signal = AbortSignal.timeout(this.#timeout * attempts);
+        const body = data !== undefined && typeof data !== 'string' ? JSON.stringify(data) : undefined;
 
-        let response: Response;
+        let response: Response | undefined;
         try {
             response = await fetch(url, {
                 method,
-                body: body ? JSON.stringify(body) : undefined,
-                signal: AbortSignal.timeout(this.#timeout * attempts),
+                body,
+                signal,
+                keepalive: true,
                 headers: {
-                    'accept': 'application/json',
-                    'content-type': 'application/json',
-                    'authorization': this.#token ? `Bearer ${this.#token}` : '',
+                    'Connection': 'Keep-Alive',
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'Authorization': this.#token ? `Bearer ${this.#token}` : '',
                     'x-goog-request-params': `project_id=${this.#project}&database_id=${this.#id}`,
-                }
+                },
             });
         } catch (error) {
+            await response?.body?.cancel();
             if (error?.name === 'TimeoutError' && idempotent && attempts < this.#attempts) {
                 return this.#fetch(method, path, body, attempts + 1);
             } else {
@@ -200,7 +212,7 @@ export default class Database {
      * @param {Number} timeout The milliseconds for request a timeout.
      * @return {Database}
      */
-    timeout (timeout: number): this {
+    timeout(timeout: number): this {
         this.#timeout = timeout;
         return this;
     }
@@ -210,7 +222,7 @@ export default class Database {
      * @param {Number} attempts The amount of attempts for timeout retries.
      * @returns {Database}
      */
-    attempts (attempts: number): this {
+    attempts(attempts: number): this {
         this.#attempts = attempts;
         return this;
     }
@@ -220,7 +232,7 @@ export default class Database {
      * @param {string}
      * @return {Database}
      */
-    base (base: string) {
+    base(base: string) {
         this.#base = new URL(base.replace(/\/+$/, ''));
         return this;
     }
