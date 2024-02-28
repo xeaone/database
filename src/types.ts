@@ -26,12 +26,12 @@ export type ApplicationDefaultCredentials = {
 export type Credential = 'meta' | 'application' | ApplicationDefaultCredentials | ServiceAccountCredentials;
 
 export type Options = {
-    base?: URL,
-    project?: string,
-    timeout?: number,
-    attempts?: number,
-    serviceAccountCredentials?: ServiceAccountCredentials,
-    applicationDefaultCredentials?: ApplicationDefaultCredentials,
+    base?: URL;
+    project?: string;
+    timeout?: number;
+    attempts?: number;
+    serviceAccountCredentials?: ServiceAccountCredentials;
+    applicationDefaultCredentials?: ApplicationDefaultCredentials;
 };
 
 export type UnaryOperator = 'IS_NAN' | 'IS_NOT_NAN' | 'IS_NULL' | 'IS_NOT_NULL';

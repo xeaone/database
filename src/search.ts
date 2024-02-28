@@ -204,4 +204,3 @@ export default class Search {
         return this.#end(body);
     }
 }
-
