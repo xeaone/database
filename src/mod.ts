@@ -116,9 +116,7 @@ export default class Database {
         await this.#auth(attempts);
 
         const idempotent = path.endsWith(':runQuery') ||
-                method !== 'CONNECT' &&
-                    method !== 'PATCH' &&
-                    method !== 'POST'
+                method !== 'CONNECT' && method !== 'PATCH' && method !== 'POST'
             ? true
             : false;
 
@@ -218,7 +216,7 @@ export default class Database {
     }
 
     /**
-     * @description Sets the max retry atttempts after request timeout. Defaults to 5.
+     * @description Sets the max retry attempts after request timeout. Defaults to 5.
      * @param {Number} attempts The amount of attempts for timeout retries.
      * @returns {Database}
      */
@@ -228,7 +226,7 @@ export default class Database {
     }
 
     /**
-     * @description The base url to use to connect to the database deafult is https://firestore.googleapis.com/v1/
+     * @description The base url to use to connect to the database default is https://firestore.googleapis.com/v1/
      * @param {string}
      * @return {Database}
      */
