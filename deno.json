@@ -1,22 +1,19 @@
 {
+    "name": "@xeaone/database",
+    "version": "3.6.3",
+    "exports": "./src/mod.ts",
     "tasks": {
-        "test": "deno test -A utl/test.ts",
-        "major": "publish major --git --tag --npm",
-        "minor": "publish minor --git --tag --npm",
-        "patch": "publish patch --git --tag --npm",
-        "emulator": "gcloud emulators firestore start --host-port=127.0.0.1:9000 --project=test"
+        "t": "deno test -A utl/test.ts",
+        "p": "deno fmt && deno lint && publish",
+        "e": "gcloud emulators firestore start --host-port=127.0.0.1:9000 --project=test"
     },
+    "include": ["."],
     "lint": {
-        "exclude": [
-            ".github",
-            ".vscode"
-        ]
+        "rules": {
+            "exclude": ["no-explicit-any"]
+        }
     },
     "fmt": {
-        "exclude": [
-            ".github",
-            ".vscode"
-        ],
         "singleQuote": true,
         "indentWidth": 4,
         "lineWidth": 800,

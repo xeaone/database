@@ -155,12 +155,12 @@ export default class Database {
         return response.json();
     }
 
-    applicationDefault(applicationDefaultCredentials: ApplicationDefaultCredentials) {
+    applicationDefault(applicationDefaultCredentials: ApplicationDefaultCredentials): this {
         this.#applicationDefaultCredentials = { ...applicationDefaultCredentials, grant_type: 'refresh_token' };
         return this;
     }
 
-    serviceAccount(serviceAccountCredentials: ServiceAccountCredentials) {
+    serviceAccount(serviceAccountCredentials: ServiceAccountCredentials): this {
         this.#serviceAccountCredentials = { ...serviceAccountCredentials };
         return this;
     }
@@ -230,7 +230,7 @@ export default class Database {
      * @param {string}
      * @return {Database}
      */
-    base(base: string) {
+    base(base: string): this {
         this.#base = new URL(base.replace(/\/+$/, ''));
         return this;
     }
