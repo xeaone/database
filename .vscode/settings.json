@@ -2,6 +2,5 @@
     "deno.lint": true,
     "deno.enable": true,
     "deno.unstable": true,
-    "deno.enablePaths": ["."],
     "editor.formatOnSave": true
 }

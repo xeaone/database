@@ -1,13 +1,12 @@
 {
     "name": "@xeaone/database",
-    "version": "3.6.3",
+    "version": "3.6.4",
     "exports": "./src/mod.ts",
     "tasks": {
         "t": "deno test -A utl/test.ts",
         "p": "deno fmt && deno lint && publish",
         "e": "gcloud emulators firestore start --host-port=127.0.0.1:9000 --project=test"
     },
-    "include": ["."],
     "lint": {
         "rules": {
             "exclude": ["no-explicit-any"]
@@ -19,5 +18,8 @@
         "lineWidth": 800,
         "semiColons": true,
         "useTabs": false
+    },
+    "imports": {
+        "@std/encoding": "jsr:@std/encoding@^0.219.1"
     }
 }
